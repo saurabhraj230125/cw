@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  /* Core CoachingWala Theme Variables */
+  --color-background: #ffffff;
+  --color-foreground: #0F172A; /* Deep Navy text */
+  
+  --color-primary: #0F172A; /* Deep Navy */
+  --color-primary-foreground: #ffffff;
+  
+  --color-accent: #2563EB; /* The Premium Blue */
+  --color-accent-foreground: #ffffff;
+  
+  --color-muted: #F8FAFC;
+  --color-muted-foreground: #64748B;
+  
+  --color-border: #E2E8F0;
+  --color-input: #E2E8F0;
+  --color-ring: #2563EB;
+  
+  --color-success: #10B981;
+  --color-success-foreground: #ffffff;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  --radius-lg: 1rem;     /* 16px - Soft rounded cards */
+  --radius-md: 0.75rem;  /* 12px - Buttons and inputs */
+  --radius-sm: 0.5rem;   /* 8px - Small elements */
+}
+
+/* Base layer resets for a perfect, native-feeling app */
+@layer base {
+  *, ::before, ::after {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    /* Perfect font rendering for a premium feel */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* Premium Custom Utilities */
+@layer utilities {
+  .shadow-soft {
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  }
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
