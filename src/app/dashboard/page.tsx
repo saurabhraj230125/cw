@@ -14,7 +14,6 @@ export default async function OwnerDashboardPage() {
 
   if (!user) redirect("/");
 
-  // Fetch the Owner's Workspace Data
   const { data: membership } = await supabase
     .from("core_memberships")
     .select(`
@@ -30,9 +29,8 @@ export default async function OwnerDashboardPage() {
   const institute = Array.isArray(membership.institutes) ? membership.institutes[0] : membership.institutes;
   const branch = Array.isArray(membership.branches) ? membership.branches[0] : membership.branches;
 
-  // Grid Items mapped with exact routing links for navigation
   const gridItems = [
-    { name: "New Enquiries", icon: UserCircle, color: "text-[#00838F]", href: "/dashboard/enquiries" },
+    { name: "New Enquiries", icon: UserCircle, color: "text-[#00838F]", href: "/dashboard/enquiries/new" },
     { name: "Manage Faculty", icon: Users, color: "text-[#1565C0]", href: "/dashboard/faculty" },
     { name: "Batch Schedule", icon: CalendarDays, color: "text-[#E65100]", href: "/dashboard/attendance" },
     { name: "Fee Collections", icon: Wallet, color: "text-[#2E7D32]", href: "/dashboard/fees" },
@@ -49,7 +47,6 @@ export default async function OwnerDashboardPage() {
   return (
     <div className="w-full bg-[#f3f4f6] min-h-screen font-sans pb-10">
       
-      {/* 1. TOP HEADER */}
       <div className="bg-white shadow-sm border-b border-gray-300">
         <div className="px-6 py-2.5 border-b border-gray-200">
           <h1 className="text-[#0055a5] text-[15px] font-bold uppercase tracking-wider">
@@ -63,12 +60,9 @@ export default async function OwnerDashboardPage() {
         </div>
       </div>
 
-      {/* 2. MAIN CONTENT AREA */}
       <div className="p-4 sm:p-6 flex flex-col xl:flex-row gap-6 items-start max-w-[1600px] mx-auto">
         
-        {/* LEFT SECTION: The Interactive Icon Grid */}
         <div className="flex-1 bg-white border border-gray-300 shadow-sm w-full xl:w-auto overflow-hidden">
-          {/* Section Header */}
           <div className="bg-[#eef5fa] px-6 py-3 border-b border-gray-300">
             <h2 className="text-[#0055a5] text-[14px] font-bold uppercase tracking-wide">Workspace Modules</h2>
           </div>
@@ -81,13 +75,10 @@ export default async function OwnerDashboardPage() {
                   href={item.href}
                   className="flex flex-col items-center justify-start gap-3 group outline-none"
                 >
-                  {/* Interactive Box: Lifts up and adds shadow on hover */}
                   <div className="w-[72px] h-[72px] bg-white rounded-xl border border-gray-300 flex items-center justify-center shadow-sm group-hover:-translate-y-1 group-hover:shadow-md group-hover:border-[#0055a5] transition-all duration-200 ease-in-out relative">
                     <item.icon className={`w-8 h-8 ${item.color} group-hover:scale-110 transition-transform duration-200`} strokeWidth={1.5} />
-                    {/* Subtle highlight ring on hover */}
                     <div className="absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-[#0055a5]/10 transition-all"></div>
                   </div>
-                  {/* Label Text */}
                   <span className="text-[13px] text-gray-800 font-medium text-center leading-tight px-1 group-hover:text-[#0055a5] transition-colors">
                     {item.name}
                   </span>
@@ -97,15 +88,11 @@ export default async function OwnerDashboardPage() {
           </div>
         </div>
 
-        {/* RIGHT SECTION: The Striped Profile Card */}
         <div className="w-full xl:w-[340px] shrink-0 bg-white border border-gray-300 shadow-sm flex flex-col">
-          
-          {/* Profile Header */}
           <div className="bg-gradient-to-b from-[#e8f5e9] to-[#c8e6c9] py-2.5 text-center border-b border-gray-300">
             <h2 className="text-[#2e7d32] text-[15px] font-bold tracking-wide">Institute Profile</h2>
           </div>
           
-          {/* Photo Area */}
           <div className="flex justify-center py-6 bg-white border-b border-gray-200 relative">
             <div className="absolute inset-0 bg-[#f8f9fa] opacity-50"></div>
             <div className="w-24 h-24 bg-white rounded-lg border border-gray-300 flex items-center justify-center overflow-hidden shadow-sm relative z-10">
@@ -113,7 +100,6 @@ export default async function OwnerDashboardPage() {
             </div>
           </div>
 
-          {/* Exact Pastel Alternating Data Rows */}
           <div className="flex flex-col text-[12.5px]">
             <div className="flex items-center bg-[#fff9c4] px-4 py-2.5 border-b border-gray-200 hover:bg-[#fff59d] transition-colors">
               <span className="w-2/5 text-[#0055a5] font-bold">Registration No</span>
@@ -159,11 +145,10 @@ export default async function OwnerDashboardPage() {
               </span>
             </div>
             
-            {/* Action Area */}
             <div className="px-4 py-5 bg-white flex justify-center">
-              <button className="bg-[#0055a5] hover:bg-[#004080] text-white px-8 py-2 rounded-[3px] text-[13px] font-bold shadow-md transition-colors flex items-center gap-2">
+              <Link href="/dashboard/settings" className="bg-[#0055a5] hover:bg-[#004080] text-white px-8 py-2 rounded-[3px] text-[13px] font-bold shadow-md transition-colors flex items-center gap-2">
                 <UserCircle className="w-4 h-4" /> View Profile
-              </button>
+              </Link>
             </div>
           </div>
 

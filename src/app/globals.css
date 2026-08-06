@@ -1,57 +1,98 @@
 @import "tailwindcss";
 
+/* 
+  TAILWIND V4 THEME CONFIGURATION 
+  This replaces the old tailwind.config.ts file 
+*/
 @theme {
-  /* Core CoachingWala Theme Variables */
-  --color-background: #ffffff;
-  --color-foreground: #0F172A; /* Deep Navy text */
-  
-  --color-primary: #0F172A; /* Deep Navy */
-  --color-primary-foreground: #ffffff;
-  
-  --color-accent: #2563EB; /* The Premium Blue */
-  --color-accent-foreground: #ffffff;
-  
-  --color-muted: #F8FAFC;
-  --color-muted-foreground: #64748B;
-  
-  --color-border: #E2E8F0;
-  --color-input: #E2E8F0;
-  --color-ring: #2563EB;
-  
-  --color-success: #10B981;
-  --color-success-foreground: #ffffff;
+  /* Core ERP Palette */
+  --color-erp-bg: #f3f4f6;
+  --color-erp-surface: #ffffff;
+  --color-erp-border: #cccccc;
+  --color-erp-borderLight: #e0e0e0;
+  --color-erp-header: #f5f5f5;
 
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #ffffff;
+  /* Brand & Action Colors */
+  --color-cw-blue: #0055a5;
+  --color-cw-blueDark: #004080;
+  --color-cw-red: #cc0000;
+  --color-cw-green: #008000;
 
-  --radius-lg: 1rem;     /* 16px - Soft rounded cards */
-  --radius-md: 0.75rem;  /* 12px - Buttons and inputs */
-  --radius-sm: 0.5rem;   /* 8px - Small elements */
+  /* Financial Pastel Summary Colors */
+  --color-pastel-blueBg: #e3f2fd;
+  --color-pastel-blueBorder: #bbdefb;
+  --color-pastel-greenBg: #e8f5e9;
+  --color-pastel-greenBorder: #a5d6a7;
+  --color-pastel-yellowBg: #fff8e1;
+  --color-pastel-yellowBorder: #ffecb3;
+  --color-pastel-redBg: #ffebee;
+  --color-pastel-redBorder: #ffcdd2;
+
+  /* Strict ERP Geometry */
+  --radius-erp: 2px;
+
+  /* Strict ERP Typography (Dense UI) */
+  --text-erp-sm: 11px;
+  --text-erp-sm--line-height: 14px;
+  
+  --text-erp-base: 12px;
+  --text-erp-base--line-height: 16px;
+  
+  --text-erp-md: 13px;
+  --text-erp-md--line-height: 18px;
+  
+  --text-erp-lg: 15px;
+  --text-erp-lg--line-height: 20px;
+
+  /* Depth & Shadows */
+  --shadow-erp-inner: inset 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-erp-button: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.2);
 }
 
-/* Base layer resets for a perfect, native-feeling app */
+/* 
+  GLOBAL HTML RULES
+  Forcing native HTML elements to match our strict ERP design
+*/
 @layer base {
-  *, ::before, ::after {
-    border-color: var(--color-border);
-  }
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-    /* Perfect font rendering for a premium feel */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+    @apply bg-erp-bg text-gray-800 font-sans antialiased text-erp-base;
   }
-}
 
-/* Premium Custom Utilities */
-@layer utilities {
-  .shadow-soft {
-    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  /* Force all tables to be strict and bordered */
+  table {
+    @apply w-full text-left border-collapse;
   }
-  .shadow-glow {
-    box-shadow: 0 0 20px rgba(37, 99, 235, 0.15);
+  th {
+    @apply font-bold text-gray-700 bg-erp-header border-b border-erp-border px-3 py-2 text-erp-base;
   }
+  td {
+    @apply border-b border-erp-borderLight px-3 py-2 text-erp-base;
+  }
+
+  /* Force standard ERP styling on all inputs natively */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="date"],
+  input[type="password"],
+  select,
+  textarea {
+    @apply border border-erp-border bg-white px-2 py-1 text-erp-base text-gray-800 shadow-erp-inner outline-none transition-colors h-[26px];
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    @apply border-cw-blue;
+  }
+
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    @apply bg-[#f0f0f0] text-gray-500 cursor-not-allowed;
+  }
+
+  /* Hide scrollbars for a cleaner look in dense data panels */
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
