@@ -1,244 +1,432 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Download, Plus, IndianRupee } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { 
+  Search, Download, Plus, IndianRupee, 
+  Wallet, TrendingUp, AlertTriangle, Loader2, Receipt, Filter, Tag, Landmark
+} from "lucide-react";
 
-// MOCK DATA
-const mockInvoices = [
-  { 
-    id: "INV-2045", 
-    student: { name: "Rahul Sharma", roll: "2026-SCI-01" }, 
-    month: "Aug 2026",
-    subjects: [
-      { name: "Class 12 Physics", fee: 1500 },
-      { name: "Class 12 Math", fee: 1500 }
-    ],
-    financials: { total: 3000, paid: 1000, balance: 2000 }, 
-    status: "Partial" 
-  },
-  { 
-    id: "INV-2046", 
-    student: { name: "Ananya Patel", roll: "2027-MED-14" }, 
-    month: "Aug 2026",
-    subjects: [
-      { name: "NEET Target Biology", fee: 2500 },
-      { name: "NEET Chemistry", fee: 2000 }
-    ],
-    financials: { total: 4500, paid: 4500, balance: 0 }, 
-    status: "Paid" 
-  },
-  { 
-    id: "INV-2047", 
-    student: { name: "Amit Kumar", roll: "2026-COM-05" }, 
-    month: "Jul 2026",
-    subjects: [
-      { name: "Class 11 Accounts", fee: 1200 }
-    ],
-    financials: { total: 1200, paid: 0, balance: 1200 }, 
-    status: "Overdue" 
-  },
-  { 
-    id: "INV-2048", 
-    student: { name: "Vikram Yadav", roll: "2026-SCI-11" }, 
-    month: "Aug 2026",
-    subjects: [
-      { name: "Class 12 Physics", fee: 1500 }
-    ],
-    financials: { total: 1500, paid: 1500, balance: 0 }, 
-    status: "Paid" 
-  },
-];
+// IMPORT REAL DATABASE ACTIONS
+import { getStudents, getAllBatches } from "../../actions/student-actions";
+
+// STRICT TYPESCRIPT INTERFACE
+interface FeeLedgerRecord {
+  id: string;
+  studentId: string;
+  rollNo: string;
+  name: string;
+  batch: string;
+  subjects: string;
+  grossFee: number;
+  discount: number;
+  netFee: number;
+  paid: number;
+  balance: number;
+  paymentMode: string;
+  status: "Paid" | "Partial" | "Unpaid";
+  isActive: boolean;
+}
 
 export default function FeeManagementPage() {
+  const [records, setRecords] = useState<FeeLedgerRecord[]>([]);
+  const [batches, setBatches] = useState<string[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // OWNER'S DEEP FILTERS
+  const [batchFilter, setBatchFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [paymentModeFilter, setPaymentModeFilter] = useState("ALL");
+  const [discountFilter, setDiscountFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter logic
-  const filteredInvoices = mockInvoices.filter(inv => 
-    statusFilter === "All" || inv.status === statusFilter
-  );
+  // --- 1. DATA FETCHING ---
+  useEffect(() => {
+    async function fetchLedgerData() {
+      setIsLoading(true);
+      try {
+        const [fetchedStudents, fetchedBatches] = await Promise.all([
+          getStudents(),
+          getAllBatches()
+        ]);
+        
+        setBatches(fetchedBatches);
 
+        // Map RAW database students into Financial Ledger Records
+        const formattedRecords: FeeLedgerRecord[] = fetchedStudents.map((s: any) => {
+          const gross = Number(s.gross_fee) || 0; 
+          const discount = Number(s.discount_amount) || 0;
+          const netFee = gross - discount;
+          const paid = Number(s.amount_paid) || 0;
+          const balance = Math.max(0, netFee - paid);
+          
+          let status: "Paid" | "Partial" | "Unpaid" = "Unpaid";
+          if (balance === 0 && netFee > 0) status = "Paid";
+          else if (paid > 0) status = "Partial";
+          else if (netFee === 0) status = "Paid"; // Free/100% Scholarship edge case
+
+          // Extract Subjects
+          let subjectNames = s.course_id || "Master Program";
+          if (s.student_subjects && s.student_subjects.length > 0) {
+            subjectNames = s.student_subjects.map((ss: any) => ss.subjects?.name).filter(Boolean).join(", ");
+          }
+
+          return {
+            id: `LED-${s.id.substring(0, 6).toUpperCase()}`, 
+            studentId: s.id,
+            rollNo: s.roll_number || "N/A",
+            name: s.full_name || "Unknown",
+            batch: s.batch_id || "Unassigned",
+            subjects: subjectNames,
+            grossFee: gross,
+            discount: discount,
+            netFee,
+            paid,
+            balance,
+            paymentMode: s.payment_mode || "Cash",
+            status,
+            isActive: s.status !== "inactive"
+          };
+        });
+
+        setRecords(formattedRecords);
+      } catch (error) {
+        console.error("Failed to load fee ledger:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchLedgerData();
+  }, []);
+
+  // --- 2. DEEP FILTERS & SEARCH ---
+  const filteredRecords = useMemo(() => {
+    return records.filter(rec => {
+      // Exclude inactive students from the main active ledger
+      if (!rec.isActive) return false;
+
+      const matchesStatus = statusFilter === "All" || rec.status === statusFilter;
+      const matchesBatch = batchFilter === "ALL" || rec.batch === batchFilter;
+      const matchesMode = paymentModeFilter === "ALL" || rec.paymentMode === paymentModeFilter;
+      
+      let matchesDiscount = true;
+      if (discountFilter === "Discounted") matchesDiscount = rec.discount > 0;
+      if (discountFilter === "FullFee") matchesDiscount = rec.discount === 0;
+
+      const matchesSearch = 
+        rec.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        rec.rollNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        rec.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesStatus && matchesBatch && matchesMode && matchesDiscount && matchesSearch;
+    });
+  }, [records, statusFilter, batchFilter, paymentModeFilter, discountFilter, searchQuery]);
+
+  // --- 3. DYNAMIC FINANCIAL METRICS ---
+  const metrics = useMemo(() => {
+    let totalExpected = 0;
+    let totalCollected = 0;
+    let totalOverdue = 0;
+    let totalDiscounts = 0;
+
+    filteredRecords.forEach(rec => {
+      totalExpected += rec.netFee;
+      totalCollected += rec.paid;
+      totalOverdue += rec.balance;
+      totalDiscounts += rec.discount;
+    });
+
+    return { totalExpected, totalCollected, totalOverdue, totalDiscounts };
+  }, [filteredRecords]);
+
+
+  // ============================================================================
+  // RENDER UI
+  // ============================================================================
   return (
-    <main className="min-h-screen bg-white font-sans flex flex-col">
+    <main className="min-h-screen bg-erp-bg font-sans flex flex-col pb-10">
       
       {/* 1. CLASSIC SUB-HEADER */}
-      <div className="px-4 py-2 border-b border-gray-300 bg-white shrink-0 flex justify-between items-center">
-        <h2 className="text-[17px] text-black font-normal">Fee Ledger & Collections</h2>
+      <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex justify-between items-center z-10 shadow-sm">
+        <h2 className="text-erp-lg text-gray-900 font-bold uppercase tracking-wide flex items-center gap-2">
+          <Wallet className="w-5 h-5 text-cw-blue" />
+          Master Fee Ledger & Collections
+        </h2>
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-1.5 bg-white border border-erp-border text-gray-700 px-4 py-1.5 text-erp-sm font-bold hover:bg-gray-50 shadow-sm rounded-erp transition-colors">
+            <Download className="w-3.5 h-3.5" /> Export Book
+          </button>
+          <button className="bg-cw-blue text-white px-5 py-1.5 rounded-erp font-bold hover:bg-cw-blueDark transition-colors shadow-erp-button flex items-center gap-1.5 text-erp-sm">
+            <Plus className="w-4 h-4" /> Bulk Invoice Run
+          </button>
+        </div>
       </div>
 
-      {/* 2. DENSE FINANCIAL SUMMARY BAR */}
-      <div className="px-4 py-1.5 bg-[#eef5fa] border-b border-gray-300 flex flex-wrap gap-x-8 gap-y-2 text-[12px] font-bold shrink-0">
-        <span className="text-[#0055a5]">Total Expected (Aug): ₹1,42,500</span>
-        <span className="text-[#008000]">Total Collected: ₹98,000</span>
-        <span className="text-[#cc0000]">Overdue Balance: ₹18,500</span>
-      </div>
-
-      {/* 3. FUNCTIONAL TOOLBAR (Strict & Compact) */}
-      <div className="px-4 py-2.5 bg-[#f5f5f5] border-b border-gray-300 flex flex-wrap items-center justify-between gap-4 shrink-0">
+      {/* 2. DENSE FINANCIAL SUMMARY DASHBOARD */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-6 py-6 bg-gray-50 border-b border-erp-border shrink-0">
         
-        <div className="flex items-center gap-4">
-          {/* Status Filter Dropdown */}
-          <div className="flex items-center gap-2">
-            <label className="text-[12px] font-bold text-gray-800 uppercase">Status:</label>
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2 py-1 border border-gray-400 bg-white text-[12px] focus:outline-none focus:border-[#0055a5] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] w-32"
-            >
-              <option value="All">All Records</option>
-              <option value="Paid">Paid</option>
-              <option value="Partial">Partial</option>
-              <option value="Overdue">Overdue</option>
-            </select>
+        <div className="bg-white p-4 rounded-erp border border-erp-border shadow-sm flex items-center gap-3 relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-cw-blue" />
+          <div className="bg-pastel-blueBg p-2.5 rounded-full border border-pastel-blueBorder">
+            <TrendingUp className="w-5 h-5 text-cw-blue" />
           </div>
-          
-          {/* Subject Filter Dropdown */}
-          <div className="flex items-center gap-2">
-            <label className="text-[12px] font-bold text-gray-800 uppercase">Subject:</label>
-            <select className="px-2 py-1 border border-gray-400 bg-white text-[12px] focus:outline-none focus:border-[#0055a5] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] w-40">
-              <option value="">All Subjects</option>
-              <option value="physics">Class 12 Physics</option>
-              <option value="neet">NEET Biology</option>
-            </select>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Expected Revenue</p>
+            <p className="text-xl font-bold text-gray-900">
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalExpected.toLocaleString()}`}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="bg-white p-4 rounded-erp border border-erp-border shadow-sm flex items-center gap-3 relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-cw-green" />
+          <div className="bg-pastel-greenBg p-2.5 rounded-full border border-pastel-greenBorder">
+            <Receipt className="w-5 h-5 text-cw-green" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Collected</p>
+            <p className="text-xl font-bold text-cw-green">
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalCollected.toLocaleString()}`}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-erp border border-erp-border shadow-sm flex items-center gap-3 relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-cw-red" />
+          <div className="bg-pastel-redBg p-2.5 rounded-full border border-pastel-redBorder">
+            <AlertTriangle className="w-5 h-5 text-cw-red" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Pending Balance</p>
+            <p className="text-xl font-bold text-cw-red">
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalOverdue.toLocaleString()}`}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-erp border border-erp-border shadow-sm flex items-center gap-3 relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-1.5 bg-[#f57f17]" />
+          <div className="bg-pastel-yellowBg p-2.5 rounded-full border border-pastel-yellowBorder">
+            <Tag className="w-5 h-5 text-[#f57f17]" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Concessions</p>
+            <p className="text-xl font-bold text-[#f57f17]">
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalDiscounts.toLocaleString()}`}
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 3. OWNER'S DEEP FILTER TOOLBAR */}
+      <div className="px-6 py-4 bg-white border-b border-erp-border flex flex-col gap-3 shrink-0 shadow-sm z-0">
+        
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Main Filters */}
+          <div className="flex flex-wrap items-center gap-5">
+            
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><Filter className="w-3.5 h-3.5"/> Batch:</label>
+              <select 
+                value={batchFilter}
+                onChange={(e) => setBatchFilter(e.target.value)}
+                className="border border-erp-border bg-gray-50 px-2 py-1 font-bold text-cw-blueDark outline-none cursor-pointer focus:border-cw-blue focus:bg-white transition-colors rounded-sm"
+              >
+                <option value="ALL">All Active Batches</option>
+                {batches.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><Receipt className="w-3.5 h-3.5"/> Status:</label>
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border border-erp-border bg-gray-50 px-2 py-1 font-bold text-cw-blueDark outline-none cursor-pointer focus:border-cw-blue focus:bg-white transition-colors rounded-sm"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Paid">Fully Paid</option>
+                <option value="Partial">Partial Payments</option>
+                <option value="Unpaid">Unpaid / Pending</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><Landmark className="w-3.5 h-3.5"/> Mode:</label>
+              <select 
+                value={paymentModeFilter}
+                onChange={(e) => setPaymentModeFilter(e.target.value)}
+                className="border border-erp-border bg-gray-50 px-2 py-1 font-bold text-cw-blueDark outline-none cursor-pointer focus:border-cw-blue focus:bg-white transition-colors rounded-sm"
+              >
+                <option value="ALL">All Payment Modes</option>
+                <option value="Cash">Cash at Counter</option>
+                <option value="UPI">UPI / Scan</option>
+                <option value="Card">Card (POS)</option>
+                <option value="Bank">Bank / Cheque</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><Tag className="w-3.5 h-3.5"/> Concession:</label>
+              <select 
+                value={discountFilter}
+                onChange={(e) => setDiscountFilter(e.target.value)}
+                className="border border-erp-border bg-gray-50 px-2 py-1 font-bold text-cw-blueDark outline-none cursor-pointer focus:border-cw-blue focus:bg-white transition-colors rounded-sm"
+              >
+                <option value="ALL">All Records</option>
+                <option value="Discounted">Discount Applied</option>
+                <option value="FullFee">Paying Full Fee</option>
+              </select>
+            </div>
+
+          </div>
+
           {/* Search Box */}
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input 
               type="text" 
-              placeholder="Search roll or name..." 
-              className="pl-7 pr-3 py-1 w-48 border border-gray-400 bg-white text-[12px] focus:outline-none focus:border-[#0055a5] shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]"
+              placeholder="Search by name, roll no..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-3 py-1.5 w-[280px] border border-erp-border focus:border-cw-blue outline-none text-erp-sm font-medium transition-colors shadow-inner rounded-sm"
             />
           </div>
-          
-          {/* Action Buttons */}
-          <button className="flex items-center gap-1.5 px-3 py-1 bg-[#f5f5f5] border border-gray-400 text-gray-700 text-[12px] font-bold hover:bg-gray-200 transition-colors shadow-sm">
-            <Download className="h-3.5 w-3.5" /> Export
-          </button>
-          <button className="flex items-center gap-1.5 bg-[#0055a5] border border-[#004080] text-white px-3 py-1 text-[12px] font-bold hover:bg-[#004080] transition-colors shadow-sm">
-            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} /> Generate Bills
-          </button>
         </div>
       </div>
 
-      {/* 4. CLASSIC ERP TABLE */}
-      <div className="flex-1 p-4 bg-white overflow-auto">
-        <div className="border border-gray-400 min-w-max">
-          <table className="w-full text-left border-collapse">
-            
-            {/* GLOSSY BLUE HEADER */}
-            <thead className="bg-gradient-to-b from-[#00a3cc] via-[#007a99] to-[#005c73] text-white text-[12px] font-bold">
-              <tr>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] w-28">
-                  Invoice No
-                </th>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] w-56">
-                  Student Details
-                </th>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
-                  Subject Breakdown
-                </th>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-right w-24">
-                  Total Bill
-                </th>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-right w-24">
-                  Paid
-                </th>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-right w-24">
-                  Balance
-                </th>
-                <th className="py-1.5 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-center w-24">
-                  Status
-                </th>
-                <th className="py-1.5 px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-center w-28">
-                  Action
-                </th>
-              </tr>
-            </thead>
-
-            {/* STRICT BORDERED ROWS */}
-            <tbody className="bg-white text-[12px] text-gray-800">
-              {filteredInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-6 text-center border-t border-gray-300 text-gray-500">
-                    No billing records found.
-                  </td>
-                </tr>
-              ) : (
-                filteredInvoices.map((invoice, index) => (
-                  <tr 
-                    key={invoice.id} 
-                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'} hover:bg-[#eef5fa] transition-colors border-b border-gray-300`}
-                  >
-                    
-                    {/* Invoice & Month */}
-                    <td className="py-2 px-3 border-r border-gray-300 align-top">
-                      <div className="font-bold text-black">{invoice.id}</div>
-                      <div className="text-[11px] text-gray-500">{invoice.month}</div>
-                    </td>
-                    
-                    {/* Student Info */}
-                    <td className="py-2 px-3 border-r border-gray-300 align-top">
-                      <div className="font-bold text-[#0055a5]">{invoice.student.roll}</div>
-                      <div className="font-semibold">{invoice.student.name}</div>
-                    </td>
-                    
-                    {/* Subject Breakdown (Strict Line items) */}
-                    <td className="py-2 px-3 border-r border-gray-300 align-top">
-                      <table className="w-full text-[11px]">
-                        <tbody>
-                          {invoice.subjects.map((sub, idx) => (
-                            <tr key={idx}>
-                              <td className="py-0.5 text-gray-700">{sub.name}</td>
-                              <td className="py-0.5 text-right font-medium">₹{sub.fee}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </td>
-                    
-                    {/* Financials - Split into explicit columns for ERP readability */}
-                    <td className="py-2 px-3 border-r border-gray-300 text-right font-bold align-top">
-                      ₹{invoice.financials.total}
-                    </td>
-                    <td className="py-2 px-3 border-r border-gray-300 text-right font-bold text-[#008000] align-top">
-                      ₹{invoice.financials.paid}
-                    </td>
-                    <td className="py-2 px-3 border-r border-gray-300 text-right font-bold text-[#cc0000] align-top">
-                      ₹{invoice.financials.balance}
-                    </td>
-                    
-                    {/* Status */}
-                    <td className="py-2 px-3 border-r border-gray-300 text-center font-bold uppercase align-top">
-                      <span className={
-                        invoice.status === 'Paid' ? 'text-[#008000]' : 
-                        invoice.status === 'Partial' ? 'text-[#ff9900]' : 
-                        'text-[#cc0000]'
-                      }>
-                        {invoice.status}
-                      </span>
-                    </td>
-                    
-                    {/* Action Links */}
-                    <td className="py-2 px-3 text-center align-top">
-                      {invoice.status !== 'Paid' ? (
-                        <button className="flex items-center justify-center gap-1 mx-auto bg-[#008000] border border-[#006600] text-white px-2 py-0.5 text-[11px] font-bold hover:bg-[#006600] shadow-sm">
-                          <IndianRupee className="w-3 h-3" /> Collect
-                        </button>
-                      ) : (
-                        <a href="#" className="text-[#0066cc] hover:text-[#003399] hover:underline font-medium text-[11px]">
-                          View Receipt
-                        </a>
-                      )}
-                    </td>
-                    
+      {/* 4. CLASSIC ERP TABLE DATA GRID */}
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="border border-erp-border bg-white shadow-sm rounded-erp max-w-[1500px] mx-auto overflow-hidden">
+          
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-32 text-gray-500">
+              <Loader2 className="w-10 h-10 animate-spin mb-4 text-cw-blue" />
+              <p className="font-bold tracking-wide">Syncing Financial Ledgers...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                
+                <thead className="bg-gray-50 border-b border-erp-border text-[11px] text-gray-600 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4 font-bold border-r border-erp-borderLight w-32">Ledger ID</th>
+                    <th className="py-3 px-4 font-bold border-r border-erp-borderLight w-64">Student Details</th>
+                    <th className="py-3 px-4 font-bold border-r border-erp-borderLight">Assigned Subjects</th>
+                    <th className="py-3 px-4 font-bold text-right border-r border-erp-borderLight w-28">Net Fee</th>
+                    <th className="py-3 px-4 font-bold text-right border-r border-erp-borderLight w-28">Collected</th>
+                    <th className="py-3 px-4 font-bold text-right border-r border-erp-borderLight w-28">Balance</th>
+                    <th className="py-3 px-4 font-bold text-center border-r border-erp-borderLight w-32">Status</th>
+                    <th className="py-3 px-4 font-bold text-center w-36">Action</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+
+                <tbody className="bg-white text-erp-base">
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-gray-500 font-medium italic bg-gray-50">
+                        No financial records found matching your exact filter criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((record, index) => (
+                      <tr 
+                        key={record.id} 
+                        className={`border-b border-erp-borderLight transition-colors hover:bg-pastel-blueBg ${index % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}`}
+                      >
+                        
+                        {/* Ledger ID */}
+                        <td className="py-3 px-4 border-r border-erp-borderLight">
+                          <span className="font-mono text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-sm border border-gray-200">
+                            {record.id}
+                          </span>
+                        </td>
+                        
+                        {/* Student Info */}
+                        <td className="py-3 px-4 border-r border-erp-borderLight">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-cw-blueDark text-[15px]">{record.name}</span>
+                            <span className="text-[11px] font-bold text-gray-500">{record.rollNo} • {record.batch}</span>
+                          </div>
+                        </td>
+                        
+                        {/* Subjects */}
+                        <td className="py-3 px-4 border-r border-erp-borderLight">
+                          <span className="text-xs font-medium text-gray-700 truncate block max-w-[200px]" title={record.subjects}>
+                            {record.subjects}
+                          </span>
+                        </td>
+                        
+                        {/* Financials Math with Deep Owner Insights */}
+                        <td className="py-3 px-4 border-r border-erp-borderLight text-right">
+                          {record.discount > 0 && (
+                            <div className="text-[10px] text-gray-400 font-bold line-through mb-0.5">₹{record.grossFee.toLocaleString()}</div>
+                          )}
+                          <div className="font-bold text-gray-900 text-[15px]">₹{record.netFee.toLocaleString()}</div>
+                          {record.discount > 0 && (
+                            <div className="text-[9px] font-bold text-[#f57f17] bg-pastel-yellowBg px-1.5 py-0.5 rounded-sm inline-block mt-0.5 border border-pastel-yellowBorder">
+                              - ₹{record.discount.toLocaleString()} Off
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4 border-r border-erp-borderLight text-right">
+                          <div className="font-bold text-cw-green text-[15px]">₹{record.paid.toLocaleString()}</div>
+                          {record.paid > 0 && (
+                            <div className="text-[9px] font-bold text-gray-500 uppercase border border-gray-200 bg-gray-50 px-1.5 py-0.5 rounded-sm inline-block mt-0.5 tracking-wider">
+                              {record.paymentMode}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4 border-r border-erp-borderLight text-right">
+                          <span className={`font-bold text-[15px] ${record.balance > 0 ? 'text-cw-red' : 'text-gray-400'}`}>
+                            ₹{record.balance.toLocaleString()}
+                          </span>
+                        </td>
+                        
+                        {/* Status Badge */}
+                        <td className="py-3 px-4 border-r border-erp-borderLight text-center">
+                          <span className={`inline-block px-3 py-1 text-[10px] font-bold uppercase rounded-sm border shadow-sm tracking-wider ${
+                            record.status === 'Paid' 
+                              ? 'bg-pastel-greenBg text-cw-green border-pastel-greenBorder' 
+                              : record.status === 'Partial' 
+                                ? 'bg-pastel-yellowBg text-[#f57f17] border-pastel-yellowBorder' 
+                                : 'bg-pastel-redBg text-cw-red border-pastel-redBorder'
+                          }`}>
+                            {record.status}
+                          </span>
+                        </td>
+                        
+                        {/* Action Buttons */}
+                        <td className="py-3 px-4 text-center">
+                          {record.balance > 0 ? (
+                            <Link 
+                              href={`/dashboard/students/${record.studentId}`}
+                              className="flex items-center justify-center gap-1 mx-auto bg-cw-green border border-[#006600] text-white px-3 py-1.5 text-[11px] font-bold rounded-sm hover:bg-[#005000] shadow-sm transition-colors w-[110px]"
+                            >
+                              <IndianRupee className="w-3.5 h-3.5" /> Collect
+                            </Link>
+                          ) : (
+                            <Link 
+                              href={`/dashboard/students/${record.studentId}`}
+                              className="flex items-center justify-center gap-1 mx-auto bg-white border border-erp-border text-cw-blue px-3 py-1.5 text-[11px] font-bold rounded-sm hover:bg-gray-50 shadow-sm transition-colors w-[110px]"
+                            >
+                              <Receipt className="w-3.5 h-3.5" /> View Ledger
+                            </Link>
+                          )}
+                        </td>
+                        
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </main>

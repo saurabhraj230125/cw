@@ -3,13 +3,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { 
   Search, Save, AlertTriangle, ChevronLeft, ChevronRight, 
-  CheckCircle2, MessageSquare, Loader2, RefreshCw, Users
+  CheckCircle2, MessageSquare, Loader2, RefreshCw, Users, Info
 } from "lucide-react";
 
-// CRITICAL FIX: Corrected relative path (2 levels up)
+// IMPORT REAL DATABASE ACTIONS
 import { getActiveBatches, getAttendanceRoster, saveAttendanceAction } from "../../actions/attendance-actions";
 
-// DEEP TYPESCRIPT FIX: Explicitly defining the data structures to remove 'any'
 export type Status = "present" | "absent" | "late";
 
 export interface RosterStudent {
@@ -17,16 +16,16 @@ export interface RosterStudent {
   roll: string;
   name: string;
   status: Status | null;
+  batch: string;
 }
 
 export default function AttendancePage() {
   // --- CORE STATE ---
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [batches, setBatches] = useState<string[]>([]);
-  const [selectedBatch, setSelectedBatch] = useState<string>("");
+  const [selectedBatch, setSelectedBatch] = useState<string>("ALL"); 
   const [searchQuery, setSearchQuery] = useState<string>("");
   
-  // FIXED: Using the strict interface instead of any[]
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [attendanceData, setAttendanceData] = useState<Record<string, Status>>({});
   
@@ -37,15 +36,15 @@ export default function AttendancePage() {
   const [isDirty, setIsDirty] = useState<boolean>(false); 
   const [sendSms, setSendSms] = useState<boolean>(true);
 
-  // --- INITIALIZATION: FETCH BATCHES ---
+  const isAllBatchesView = selectedBatch === "ALL";
+
+  // --- 1. INITIALIZATION: FETCH BATCHES ---
   useEffect(() => {
     async function init() {
       try {
         const fetchedBatches = await getActiveBatches();
-        setBatches(fetchedBatches);
-        if (fetchedBatches.length > 0) {
-          setSelectedBatch(fetchedBatches[0]); 
-        }
+        setBatches(["ALL", ...fetchedBatches]); 
+        setSelectedBatch("ALL"); 
       } catch (error) {
         console.error("Failed to initialize batches", error);
       } finally {
@@ -55,7 +54,19 @@ export default function AttendancePage() {
     init();
   }, []);
 
-  // --- DATA FETCHING: LOAD STUDENTS & PAST ATTENDANCE ---
+  // --- 2. PREVENT ACCIDENTAL TAB CLOSURE ---
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved attendance marks. Are you sure you want to leave?";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  // --- 3. DATA FETCHING: LOAD STUDENTS & PAST ATTENDANCE ---
   useEffect(() => {
     if (!selectedBatch) return;
 
@@ -69,7 +80,6 @@ export default function AttendancePage() {
         if (isMounted) {
           setStudents(data);
           
-          // Auto-populate state with previously saved attendance (if any)
           const savedState: Record<string, Status> = {};
           data.forEach((stu: RosterStudent) => {
             if (stu.status) savedState[stu.id] = stu.status;
@@ -86,17 +96,18 @@ export default function AttendancePage() {
     }
 
     loadRoster();
-
     return () => { isMounted = false; };
   }, [selectedBatch, selectedDate]); 
 
   // --- HANDLERS ---
   const toggleStatus = (studentId: string, status: Status) => {
+    if (isAllBatchesView) return; // Prevent marking in ALL view to protect DB integrity
     setAttendanceData(prev => ({ ...prev, [studentId]: status }));
     setIsDirty(true);
   };
 
   const markAllPresent = () => {
+    if (isAllBatchesView) return;
     const allPresent: Record<string, Status> = {};
     students.forEach((s: RosterStudent) => {
       allPresent[s.id] = "present";
@@ -122,6 +133,7 @@ export default function AttendancePage() {
   };
 
   const handleSave = async () => {
+    if (isAllBatchesView) return; // Hard guard
     if (Object.keys(attendanceData).length === 0) {
       alert("No attendance data marked.");
       return;
@@ -135,7 +147,6 @@ export default function AttendancePage() {
         alert(`Attendance permanently saved for ${selectedDate}.${sendSms ? "\n\nSMS Alerts queued for absentees." : ""}`);
       }
     } catch (error: unknown) {
-      // TypeScript strict error handling fix
       const err = error as Error;
       alert(err.message || "Failed to save attendance.");
     } finally {
@@ -145,10 +156,12 @@ export default function AttendancePage() {
 
   // --- DERIVED DATA & FILTERS ---
   const filteredStudents = useMemo(() => {
-    return students.filter((s: RosterStudent) => 
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      s.roll.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return students.filter((s: RosterStudent) => {
+      const safeName = s.name || "";
+      const safeRoll = s.roll || "";
+      return safeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+             safeRoll.toLowerCase().includes(searchQuery.toLowerCase());
+    });
   }, [students, searchQuery]);
 
   const summary = useMemo(() => {
@@ -161,25 +174,28 @@ export default function AttendancePage() {
     return counts;
   }, [attendanceData, students]);
 
-  // INITIAL LOADING UI
+  const completionPercentage = students.length === 0 ? 0 : Math.round(((students.length - summary.unmarked) / students.length) * 100);
+
+  // --- INITIAL UI STATE ---
   if (isInitializing) {
     return (
       <main className="min-h-screen bg-erp-bg flex items-center justify-center">
-        <p className="text-gray-500 font-bold flex items-center gap-2 text-erp-lg">
-          <Loader2 className="w-5 h-5 animate-spin text-cw-blue" /> Initializing Attendance Module...
-        </p>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-cw-blue" />
+          <p className="text-gray-500 font-bold text-erp-md">Initializing Attendance Module...</p>
+        </div>
       </main>
     );
   }
 
-  // EMPTY STATE: NO BATCHES FOUND
-  if (batches.length === 0) {
+  // --- EMPTY STATE ---
+  if (batches.length <= 1) { // Only "ALL" is in the list
     return (
       <main className="min-h-screen bg-erp-bg flex items-center justify-center">
         <div className="bg-white p-8 rounded-erp border border-erp-border shadow-sm text-center max-w-md">
           <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <h2 className="text-erp-lg font-bold text-gray-800 mb-2">No Active Batches</h2>
-          <p className="text-erp-base text-gray-600">You must complete a new student admission and assign them to a batch before taking attendance.</p>
+          <p className="text-erp-base text-gray-600">You must complete a new student admission and strictly assign them to a batch before taking attendance.</p>
         </div>
       </main>
     );
@@ -190,14 +206,18 @@ export default function AttendancePage() {
       
       {/* 1. CLASSIC SUB-HEADER */}
       <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex justify-between items-center z-10 shadow-sm">
-        <h2 className="text-[18px] text-gray-900 font-bold uppercase tracking-wide">
+        <h2 className="text-erp-lg text-gray-900 font-bold uppercase tracking-wide">
           Master Attendance Register
         </h2>
-        {isDirty && <span className="text-cw-red text-erp-sm font-bold flex items-center gap-1.5 px-3 py-1 bg-pastel-redBg rounded-erp border border-pastel-redBorder animate-pulse"><AlertTriangle className="w-3.5 h-3.5" /> Unsaved Changes</span>}
+        {isDirty && (
+          <span className="text-cw-red text-erp-sm font-bold flex items-center gap-1.5 px-3 py-1.5 bg-pastel-redBg rounded-erp border border-pastel-redBorder animate-in fade-in zoom-in-95 duration-200">
+            <AlertTriangle className="w-4 h-4" /> Unsaved Changes
+          </span>
+        )}
       </div>
 
       {/* 2. FUNCTIONAL TOOLBAR */}
-      <div className="px-6 py-3 bg-white border-b border-erp-border flex flex-wrap items-center gap-6 shrink-0 z-10 shadow-sm">
+      <div className="px-6 py-3 bg-white border-b border-erp-border flex flex-wrap items-center gap-6 shrink-0 z-10 shadow-sm relative">
         
         {/* Batch Selector */}
         <div className="flex items-center gap-2">
@@ -205,10 +225,10 @@ export default function AttendancePage() {
           <select 
             value={selectedBatch}
             onChange={(e) => handleBatchChange(e.target.value)}
-            className="w-[250px] font-bold text-cw-blueDark border border-erp-border px-2 py-1.5 focus:border-cw-blue outline-none cursor-pointer"
+            className="w-[260px] font-bold text-cw-blueDark border border-erp-border px-2 py-1.5 focus:border-cw-blue outline-none cursor-pointer bg-white shadow-sm"
           >
             {batches.map(b => (
-              <option key={b} value={b}>{b}</option>
+              <option key={b} value={b}>{b === "ALL" ? "== View All Active Students ==" : b}</option>
             ))}
           </select>
         </div>
@@ -216,7 +236,7 @@ export default function AttendancePage() {
         {/* Strict Date Navigator */}
         <div className="flex items-center gap-2">
           <label className="text-erp-sm font-bold text-gray-600 uppercase">Ledger Date:</label>
-          <div className="flex items-center border border-erp-border bg-white shadow-sm h-[32px]">
+          <div className="flex items-center border border-erp-border bg-white shadow-sm h-[32px] rounded-sm overflow-hidden">
             <button onClick={() => handleDateChange(-1)} className="px-3 h-full hover:bg-gray-100 border-r border-erp-border transition-colors flex items-center justify-center">
               <ChevronLeft className="h-4 w-4 text-gray-600" />
             </button>
@@ -227,7 +247,7 @@ export default function AttendancePage() {
                 if (isDirty && !window.confirm("Discard unsaved marks?")) return;
                 setSelectedDate(e.target.value);
               }}
-              className="border-none shadow-none h-full w-[140px] text-center font-bold text-gray-800 outline-none focus:ring-0 cursor-pointer"
+              className="border-none shadow-none h-full w-[140px] text-center font-bold text-gray-800 outline-none focus:ring-0 cursor-pointer text-erp-sm"
             />
             <button onClick={() => handleDateChange(1)} className="px-3 h-full hover:bg-gray-100 border-l border-erp-border transition-colors flex items-center justify-center">
               <ChevronRight className="h-4 w-4 text-gray-600" />
@@ -244,94 +264,145 @@ export default function AttendancePage() {
               placeholder="Search roster..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-[220px] border border-erp-border focus:border-cw-blue outline-none text-erp-sm font-medium"
+              className="pl-8 pr-3 py-1.5 w-[240px] border border-erp-border focus:border-cw-blue outline-none text-erp-sm font-medium shadow-sm"
             />
           </div>
           
           <button 
             onClick={handleSave}
-            disabled={isSaving || isLoading || !isDirty}
-            className="flex items-center gap-1.5 bg-cw-green border border-[#006600] text-white px-6 py-1.5 text-erp-md font-bold hover:bg-[#005000] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-erp-button rounded-erp"
+            disabled={isSaving || isLoading || !isDirty || isAllBatchesView}
+            className={`flex items-center gap-1.5 px-6 py-1.5 text-erp-md font-bold rounded-erp shadow-sm transition-colors ${
+              isAllBatchesView 
+                ? "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed" 
+                : "bg-cw-green border border-[#006600] text-white hover:bg-[#005000] shadow-erp-button disabled:opacity-50 disabled:cursor-not-allowed"
+            }`}
           >
-            {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {isSaving ? "Writing to DB..." : "Save Register"}
           </button>
         </div>
+
+        {/* PROGRESS BAR OVERLAY */}
+        {!isAllBatchesView && students.length > 0 && (
+          <div className="absolute bottom-0 left-0 h-[3px] bg-gray-200 w-full">
+            <div 
+              className={`h-full transition-all duration-500 ${completionPercentage === 100 ? 'bg-cw-green' : 'bg-cw-blue'}`}
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {/* 3. STATUS BAR & BULK ACTIONS */}
       <div className="px-6 py-2.5 bg-erp-header border-b border-erp-border flex justify-between items-center text-erp-base shrink-0">
-        <div className="flex gap-6 font-bold text-sm tracking-wide">
-          <span className="text-gray-700 bg-white px-2 border border-erp-border rounded-sm">Total: {students.length}</span>
+        <div className="flex gap-6 font-bold tracking-wide items-center">
+          <span className="text-gray-700 bg-white px-2 py-0.5 border border-erp-border shadow-sm rounded-sm">Roster: {students.length}</span>
           <span className="text-cw-green">Present: {summary.present}</span>
           <span className="text-cw-red">Absent: {summary.absent}</span>
           <span className="text-[#f57f17]">Late: {summary.late}</span>
-          {summary.unmarked > 0 && <span className="text-gray-500 animate-pulse">Unmarked: {summary.unmarked}</span>}
+          {summary.unmarked > 0 && !isAllBatchesView && (
+            <span className="text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" /> Unmarked: {summary.unmarked}</span>
+          )}
         </div>
         
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-1.5 text-erp-sm font-bold text-gray-700 cursor-pointer">
-            <input type="checkbox" checked={sendSms} onChange={() => setSendSms(!sendSms)} className="w-3.5 h-3.5 mt-0.5 accent-cw-blue" />
-            <MessageSquare className="w-3.5 h-3.5 text-cw-blue" /> Auto-SMS Absentees
+            <input 
+              type="checkbox" 
+              checked={sendSms} 
+              onChange={() => setSendSms(!sendSms)} 
+              disabled={isAllBatchesView}
+              className="w-3.5 h-3.5 mt-0.5 accent-cw-blue disabled:opacity-50 cursor-pointer" 
+            />
+            <MessageSquare className={`w-3.5 h-3.5 ${isAllBatchesView ? 'text-gray-400' : 'text-cw-blue'}`} /> 
+            <span className={isAllBatchesView ? 'text-gray-400' : ''}>Auto-SMS Absentees</span>
           </label>
           <span className="text-gray-300">|</span>
-          <button onClick={markAllPresent} className="text-cw-green hover:underline font-bold text-erp-sm flex items-center gap-1 bg-white border border-erp-border px-2 py-0.5 rounded-sm shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Mark All Present
+          <button 
+            onClick={markAllPresent} 
+            disabled={isAllBatchesView || isLoading}
+            className={`font-bold text-erp-sm flex items-center gap-1 px-3 py-1 border rounded-sm shadow-sm transition-colors ${
+              isAllBatchesView 
+                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" 
+                : "bg-white text-cw-green border-erp-border hover:bg-pastel-greenBg hover:border-cw-green"
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4" /> Mark All Present
           </button>
         </div>
       </div>
 
-      {/* 4. CLASSIC ERP TABLE DATA GRID */}
-      <div className="flex-1 p-6 overflow-auto">
-        <div className="border border-erp-border bg-white shadow-sm rounded-erp max-w-[1200px] mx-auto">
+      {/* 4. ALL BATCHES WARNING BANNER */}
+      {isAllBatchesView && (
+        <div className="bg-pastel-yellowBg border-b border-pastel-yellowBorder px-6 py-2 flex items-center gap-2 text-erp-sm text-gray-800 shadow-sm shrink-0">
+          <Info className="w-4 h-4 text-[#f57f17]" />
+          <strong>Read-Only Mode:</strong> You are currently viewing the master list of all students. Please select a specific batch from the dropdown above to mark and save attendance.
+        </div>
+      )}
+
+      {/* 5. CLASSIC ERP TABLE DATA GRID */}
+      <div className="flex-1 p-6 overflow-auto bg-erp-bg">
+        <div className="border border-erp-border bg-white shadow-sm rounded-erp max-w-[1400px] mx-auto overflow-hidden flex flex-col h-full relative">
           
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center p-20 text-gray-500">
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
               <RefreshCw className="w-8 h-8 animate-spin mb-4 text-cw-blue" />
-              <p className="font-bold">Fetching secure database roster...</p>
+              <p className="font-bold text-gray-600">Fetching secure database roster...</p>
             </div>
-          ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50 border-b border-erp-border text-erp-sm text-gray-600 uppercase tracking-wide">
-                  <th className="py-3 px-6 w-24 text-center font-bold">Roll No</th>
-                  <th className="py-3 px-6 w-[350px] font-bold">Student Name</th>
-                  <th className="py-3 px-6 text-center font-bold">Attendance Matrix</th>
+          )}
+
+          <div className="overflow-auto flex-1 relative">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-gray-50 border-b border-erp-border shadow-sm">
+                <tr className="text-erp-sm text-gray-600 uppercase tracking-wide">
+                  <th className="py-3 px-6 w-24 text-center font-bold border-r border-erp-borderLight">Roll No</th>
+                  <th className="py-3 px-6 font-bold border-r border-erp-borderLight">Student Name</th>
+                  {isAllBatchesView && <th className="py-3 px-6 font-bold border-r border-erp-borderLight">Batch</th>}
+                  <th className="py-3 px-6 text-center font-bold w-[380px]">Attendance Matrix</th>
                 </tr>
               </thead>
 
-              <tbody>
-                {filteredStudents.length === 0 ? (
+              <tbody className="bg-white text-erp-base">
+                {filteredStudents.length === 0 && !isLoading ? (
                   <tr>
-                    <td colSpan={3} className="p-8 text-center font-bold text-gray-500 italic">
-                      No students found in {selectedBatch} for this date.
+                    <td colSpan={isAllBatchesView ? 4 : 3} className="py-12 text-center font-bold text-gray-500 italic bg-gray-50">
+                      No student records found matching your filter criteria.
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((student, index) => (
                     <tr 
                       key={student.id} 
-                      className={`border-b border-erp-borderLight ${index % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-pastel-blueBg transition-colors`}
+                      className={`border-b border-erp-borderLight ${index % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-pastel-blueBg transition-colors group`}
                     >
-                      <td className="py-3 px-6 text-center font-bold text-gray-800">{student.roll}</td>
+                      <td className="py-3 px-6 text-center font-bold text-gray-800 border-r border-erp-borderLight">{student.roll}</td>
                       
-                      <td className="py-3 px-6">
+                      <td className="py-3 px-6 border-r border-erp-borderLight">
                         <div className="flex flex-col">
                           <span className="font-bold text-cw-blueDark text-erp-base">{student.name}</span>
-                          <span className="text-[10px] font-mono text-gray-400">{student.id}</span>
+                          <span className="text-[10px] font-mono text-gray-400 group-hover:text-cw-blue transition-colors">{student.id}</span>
                         </div>
                       </td>
+
+                      {isAllBatchesView && (
+                        <td className="py-3 px-6 border-r border-erp-borderLight">
+                          <span className="bg-white text-gray-600 border border-gray-300 px-2.5 py-0.5 text-[11px] font-bold rounded-[2px] shadow-sm uppercase">
+                            {student.batch}
+                          </span>
+                        </td>
+                      )}
                       
                       {/* Segmented Control for Attendance Marking */}
-                      <td className="py-3 px-6 text-center">
-                        <div className="inline-flex shadow-sm border border-erp-border rounded-[3px] overflow-hidden">
+                      <td className="py-2.5 px-6 text-center bg-white group-hover:bg-transparent transition-colors">
+                        <div className={`inline-flex shadow-sm border rounded-[3px] overflow-hidden ${isAllBatchesView ? 'border-gray-200 opacity-60' : 'border-erp-border'}`}>
                           
                           <button 
                             onClick={() => toggleStatus(student.id, "present")}
-                            className={`px-6 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-colors ${
+                            disabled={isAllBatchesView}
+                            className={`px-7 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${
                               attendanceData[student.id] === "present" 
-                                ? "bg-cw-green text-white" 
-                                : "bg-white text-gray-500 hover:bg-gray-100"
+                                ? "bg-cw-green text-white shadow-inner" 
+                                : "bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:hover:bg-gray-50"
                             }`}
                           >
                             Present
@@ -339,10 +410,11 @@ export default function AttendancePage() {
                           
                           <button 
                             onClick={() => toggleStatus(student.id, "absent")}
-                            className={`px-6 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-colors ${
+                            disabled={isAllBatchesView}
+                            className={`px-7 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${
                               attendanceData[student.id] === "absent" 
-                                ? "bg-cw-red text-white" 
-                                : "bg-white text-gray-500 hover:bg-gray-100"
+                                ? "bg-cw-red text-white shadow-inner" 
+                                : "bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:hover:bg-gray-50"
                             }`}
                           >
                             Absent
@@ -350,10 +422,11 @@ export default function AttendancePage() {
                           
                           <button 
                             onClick={() => toggleStatus(student.id, "late")}
-                            className={`px-6 py-1.5 text-erp-sm font-bold uppercase transition-colors ${
+                            disabled={isAllBatchesView}
+                            className={`px-7 py-1.5 text-erp-sm font-bold uppercase transition-all ${
                               attendanceData[student.id] === "late" 
-                                ? "bg-[#f57f17] text-white" 
-                                : "bg-white text-gray-500 hover:bg-gray-100"
+                                ? "bg-[#f57f17] text-white shadow-inner" 
+                                : "bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:hover:bg-gray-50"
                             }`}
                           >
                             Late
@@ -366,7 +439,7 @@ export default function AttendancePage() {
                 )}
               </tbody>
             </table>
-          )}
+          </div>
         </div>
       </div>
     </main>

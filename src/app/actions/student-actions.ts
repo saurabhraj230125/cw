@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "../../lib/supabase/server";
 
 // ==========================================
-// 1. FETCH ALL STUDENTS
+// 1. FETCH ALL STUDENTS (Directory View)
 // ==========================================
 export async function getStudents() {
   const supabase = await createClient();
@@ -41,7 +41,35 @@ export async function getStudents() {
 }
 
 // ==========================================
-// 2. FETCH ACTIVE SUBJECTS
+// 2. FETCH ALL UNIQUE BATCHES (This fixes your error!)
+// ==========================================
+export async function getAllBatches() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: membership } = await supabase
+    .from("core_memberships")
+    .select("branch_id")
+    .eq("user_id", user?.id)
+    .single();
+
+  if (!membership) return [];
+
+  const { data, error } = await supabase
+    .from("students")
+    .select("batch_id")
+    .eq("branch_id", membership.branch_id)
+    .not("batch_id", "is", null);
+
+  if (error || !data) return [];
+
+  // Extract unique batch names dynamically
+  const uniqueBatches = Array.from(new Set(data.map(s => s.batch_id).filter(Boolean)));
+  return uniqueBatches;
+}
+
+// ==========================================
+// 3. FETCH ACTIVE SUBJECTS (For Master Wizard)
 // ==========================================
 export async function getBranchSubjects() {
   const supabase = await createClient();
@@ -71,7 +99,7 @@ export async function getBranchSubjects() {
 }
 
 // ==========================================
-// 3. CREATE NEW STUDENT
+// 4. CREATE NEW STUDENT (From 5-Step Wizard)
 // ==========================================
 export async function addStudentAction(formData: FormData) {
   const supabase = await createClient();
@@ -96,17 +124,14 @@ export async function addStudentAction(formData: FormData) {
     email: formData.get("email") as string,
     status: "active",
     
-    // Demographics
     date_of_birth: formData.get("dob") as string || null,
     gender: formData.get("gender") as string,
     category: formData.get("category") as string,
     government_id: formData.get("government_id") as string,
     
-    // Academics & Batch
     batch_id: formData.get("batch_id") as string,
     course_id: formData.get("course_name") as string, 
     
-    // Guardians
     guardian_name: formData.get("guardian_name") as string,
     guardian_relation: formData.get("guardian_relation") as string,
     guardian_email: formData.get("guardian_email") as string,
@@ -115,7 +140,6 @@ export async function addStudentAction(formData: FormData) {
     sec_guardian_phone: formData.get("sec_guardian_phone") as string,
     sec_guardian_email: formData.get("sec_guardian_email") as string,
     
-    // Financials
     gross_fee: parseInt(formData.get("gross_fee") as string) || 0,
     discount_amount: parseInt(formData.get("discount_amount") as string) || 0,
     amount_paid: parseInt(formData.get("amount_paid") as string) || 0,
@@ -142,7 +166,6 @@ export async function addStudentAction(formData: FormData) {
       student_id: newStudent.id,
       subject_id: sub_id
     }));
-
     await supabase.from("student_subjects").insert(enrollments);
   }
 
@@ -151,7 +174,7 @@ export async function addStudentAction(formData: FormData) {
 }
 
 // ==========================================
-// 4. UPDATE EXISTING STUDENT
+// 5. UPDATE EXISTING STUDENT
 // ==========================================
 export async function updateStudentAction(studentId: string, formData: FormData) {
   const supabase = await createClient();
@@ -174,17 +197,14 @@ export async function updateStudentAction(studentId: string, formData: FormData)
     whatsapp_number: formData.get("whatsapp_number") as string,
     email: formData.get("email") as string,
     
-    // Demographics
     date_of_birth: formData.get("dob") as string || null,
     gender: formData.get("gender") as string,
     category: formData.get("category") as string,
     government_id: formData.get("government_id") as string,
     
-    // Academics & Batch
     batch_id: formData.get("batch_id") as string,
     course_id: formData.get("course_name") as string, 
     
-    // Guardians
     guardian_name: formData.get("guardian_name") as string,
     guardian_relation: formData.get("guardian_relation") as string,
     guardian_email: formData.get("guardian_email") as string,
@@ -193,7 +213,6 @@ export async function updateStudentAction(studentId: string, formData: FormData)
     sec_guardian_phone: formData.get("sec_guardian_phone") as string,
     sec_guardian_email: formData.get("sec_guardian_email") as string,
     
-    // Financials
     gross_fee: parseInt(formData.get("gross_fee") as string) || 0,
     discount_amount: parseInt(formData.get("discount_amount") as string) || 0,
     amount_paid: parseInt(formData.get("amount_paid") as string) || 0,
@@ -210,13 +229,11 @@ export async function updateStudentAction(studentId: string, formData: FormData)
     throw new Error(updateError.message || "Failed to update student record.");
   }
 
-  // Update enrolled subjects
+  // Update enrolled subjects securely
   const subject_ids = formData.getAll("subject_ids") as string[];
   if (subject_ids.length > 0) {
-    // Delete existing links first
     await supabase.from("student_subjects").delete().eq("student_id", studentId);
     
-    // Re-insert selected subjects
     const enrollments = subject_ids.map(sub_id => ({
       branch_id: membership.branch_id,
       student_id: studentId,
@@ -231,7 +248,7 @@ export async function updateStudentAction(studentId: string, formData: FormData)
 }
 
 // ==========================================
-// 5. FETCH SINGLE STUDENT BY ID
+// 6. FETCH SINGLE STUDENT BY ID (Profile View)
 // ==========================================
 export async function getStudentById(studentId: string) {
   try {
@@ -243,6 +260,10 @@ export async function getStudentById(studentId: string) {
         *,
         student_subjects (
           subjects ( id, name )
+        ),
+        attendance (
+          status,
+          date
         )
       `)
       .eq("id", studentId)
@@ -254,4 +275,70 @@ export async function getStudentById(studentId: string) {
     console.error("Error fetching student profile:", error.message);
     return { success: false, message: error.message };
   }
+}
+
+// ==========================================
+// 7. TOGGLE STUDENT STATUS (Active/Inactive)
+// ==========================================
+export async function toggleStudentStatusAction(studentId: string, currentStatus: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: membership } = await supabase
+    .from("core_memberships")
+    .select("branch_id")
+    .eq("user_id", user?.id)
+    .single();
+
+  if (!membership) throw new Error("Unauthorized access.");
+
+  const newStatus = currentStatus === "active" ? "inactive" : "active";
+
+  const { error } = await supabase
+    .from("students")
+    .update({ status: newStatus })
+    .eq("id", studentId)
+    .eq("branch_id", membership.branch_id);
+
+  if (error) {
+    throw new Error(error.message || "Failed to update student status.");
+  }
+
+  revalidatePath("/dashboard/students");
+  revalidatePath(`/dashboard/students/${studentId}`);
+  return { success: true, newStatus };
+}
+
+// ==========================================
+// 8. PERMANENT HARD DELETE (With Cascading)
+// ==========================================
+export async function deleteStudentAction(studentId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: membership } = await supabase
+    .from("core_memberships")
+    .select("branch_id")
+    .eq("user_id", user?.id)
+    .single();
+
+  if (!membership) throw new Error("Unauthorized access.");
+
+  // CRITICAL: Prevent Foreign Key Crashes by wiping dependencies first
+  await supabase.from("attendance").delete().eq("student_id", studentId);
+  await supabase.from("student_subjects").delete().eq("student_id", studentId);
+
+  // Safely wipe the student record
+  const { error } = await supabase
+    .from("students")
+    .delete()
+    .eq("id", studentId)
+    .eq("branch_id", membership.branch_id);
+
+  if (error) {
+    throw new Error(error.message || "Failed to permanently delete student.");
+  }
+
+  revalidatePath("/dashboard/students");
+  return { success: true };
 }
