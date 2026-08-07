@@ -7,11 +7,16 @@ import {
   ArrowLeft, User, Phone, MapPin, 
   BookOpen, Edit3, Download, GraduationCap, Percent, Wallet, AlertTriangle,
   Mail, Users, CreditCard, Receipt, CalendarClock, Tag, ShieldCheck, Plus, 
-  ShieldAlert, PowerOff, Trash2, Loader2, CalendarCheck
+  ShieldAlert, PowerOff, Trash2, Loader2, CalendarCheck, X, IndianRupee, CheckCircle2
 } from "lucide-react";
 
 // Import the real database fetchers and actions
-import { getStudentById, toggleStudentStatusAction, deleteStudentAction } from "../../../actions/student-actions";
+import { 
+  getStudentById, 
+  toggleStudentStatusAction, 
+  deleteStudentAction,
+  collectPaymentAction // NEW: POS Backend Action
+} from "../../../actions/student-actions";
 
 export default function StudentProfileView() {
   const params = useParams();
@@ -22,6 +27,13 @@ export default function StudentProfileView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+
+  // --- NEW: PAYMENT POS MODAL STATE ---
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [payAmount, setPayAmount] = useState<string>("");
+  const [payMode, setPayMode] = useState("Cash");
+  const [payParticulars, setPayParticulars] = useState("Fee Installment");
 
   async function loadStudent() {
     setIsLoading(true);
@@ -56,6 +68,20 @@ export default function StudentProfileView() {
         ? Math.round(((presentCount + lateCount) / totalSessions) * 100) 
         : 0;
 
+      // =========================================================
+      // DEEP FINANCIAL CALCULATOR & LEDGER SORTING
+      // =========================================================
+      const gross = Number(dbData.gross_fee) || 0;
+      const discount = Number(dbData.discount_amount) || 0;
+      const netFee = gross - discount;
+      const paid = Number(dbData.amount_paid) || 0;
+      const due = Math.max(0, netFee - paid);
+
+      const rawCollections = dbData.fee_collections || [];
+      const sortedCollections = rawCollections.sort((a: any, b: any) => 
+        new Date(b.collection_date).getTime() - new Date(a.collection_date).getTime()
+      );
+
       setStudent({
         id: dbData.id,
         rollNo: dbData.roll_number || "N/A",
@@ -85,7 +111,6 @@ export default function StudentProfileView() {
         admissionDate: dbData.created_at ? new Date(dbData.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : "Unknown",
         status: dbData.status?.toUpperCase() || "ACTIVE", 
         
-        // Formatted Attendance payload
         attendance: {
           total: totalSessions,
           present: presentCount,
@@ -95,13 +120,14 @@ export default function StudentProfileView() {
         },
 
         financials: {
-          grossFee: Number(dbData.gross_fee) || 0,
-          discount: Number(dbData.discount_amount) || 0,
-          netFee: (Number(dbData.gross_fee) || 0) - (Number(dbData.discount_amount) || 0),
-          paid: Number(dbData.amount_paid) || 0,
-          due: ((Number(dbData.gross_fee) || 0) - (Number(dbData.discount_amount) || 0)) - (Number(dbData.amount_paid) || 0),
+          grossFee: gross,
+          discount: discount,
+          netFee: netFee,
+          paid: paid,
+          due: due,
           paymentMode: dbData.payment_mode || "Cash",
         },
+        transactions: sortedCollections,
       });
       setFetchError(false);
     } else {
@@ -142,6 +168,27 @@ export default function StudentProfileView() {
     } catch (err: any) {
       alert(err.message);
       setIsProcessing(false);
+    }
+  };
+
+  // --- NEW: HANDLE PAYMENT SUBMISSION ---
+  const handleProcessPayment = async () => {
+    const amountNum = Number(payAmount);
+    if (!amountNum || amountNum <= 0) return alert("Enter a valid amount.");
+    if (amountNum > student.financials.due) return alert("Amount exceeds the pending balance!");
+
+    setIsProcessingPayment(true);
+    try {
+      await collectPaymentAction(student.id, amountNum, payMode, payParticulars);
+      setIsPaymentModalOpen(false); // Close Modal
+      setPayAmount(""); // Reset Field
+      setPayParticulars("Fee Installment"); // Reset
+      await loadStudent(); // Deeply Refresh Page Data to show new transaction!
+      alert("Payment successfully recorded into the ledger!");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -193,8 +240,84 @@ export default function StudentProfileView() {
   const isInactive = student.status === "INACTIVE";
 
   return (
-    <main className="min-h-screen bg-erp-bg font-sans flex flex-col pb-10">
+    <main className="min-h-screen bg-erp-bg font-sans flex flex-col pb-10 relative">
       
+      {/* ================================================================= */}
+      {/* POS PAYMENT MODAL OVERLAY */}
+      {/* ================================================================= */}
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-erp shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-cw-blue p-4 flex justify-between items-center text-white">
+              <h3 className="font-bold flex items-center gap-2 text-lg"><IndianRupee className="w-5 h-5"/> POS Collection</h3>
+              <button onClick={() => setIsPaymentModalOpen(false)} className="hover:bg-white/20 p-1 rounded-sm transition-colors"><X className="w-5 h-5"/></button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <div className="bg-pastel-blueBg border border-pastel-blueBorder p-3 rounded-sm flex justify-between items-center shadow-inner">
+                <span className="text-erp-sm font-bold text-cw-blueDark uppercase">Balance Due:</span>
+                <span className="text-xl font-bold text-cw-red">₹{student.financials.due.toLocaleString()}</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-erp-sm font-bold text-gray-700">Amount Collecting Today (₹) <span className="text-cw-red">*</span></label>
+                <input 
+                  type="number" 
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder={`Max: ${student.financials.due}`}
+                  max={student.financials.due}
+                  className="w-full text-2xl font-bold text-cw-green border-2 border-cw-green focus:border-cw-blue bg-pastel-greenBg p-3 outline-none transition-colors shadow-inner"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-erp-sm font-bold text-gray-700">Payment Mode <span className="text-cw-red">*</span></label>
+                <select 
+                  value={payMode}
+                  onChange={(e) => setPayMode(e.target.value)}
+                  className="w-full border border-erp-border p-2.5 font-bold text-gray-900 outline-none focus:border-cw-blue cursor-pointer shadow-inner"
+                >
+                  <option value="Cash">Cash at Counter</option>
+                  <option value="UPI">UPI / QR Scan</option>
+                  <option value="Card">Credit/Debit Card (POS)</option>
+                  <option value="Bank">Bank Cheque / NEFT</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-erp-sm font-bold text-gray-700">Particulars / Remarks <span className="text-cw-red">*</span></label>
+                <input 
+                  type="text" 
+                  value={payParticulars}
+                  onChange={(e) => setPayParticulars(e.target.value)}
+                  className="w-full border border-erp-border p-2.5 text-erp-base outline-none focus:border-cw-blue shadow-inner"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-erp-border flex gap-3">
+              <button 
+                onClick={() => setIsPaymentModalOpen(false)} 
+                className="flex-1 bg-white border border-erp-border text-gray-700 py-2.5 font-bold rounded-erp hover:bg-gray-100 transition-colors shadow-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleProcessPayment} 
+                disabled={isProcessingPayment || !payAmount}
+                className="flex-1 bg-cw-green text-white py-2.5 font-bold rounded-erp hover:bg-[#006600] flex items-center justify-center gap-2 shadow-erp-button disabled:opacity-50 transition-colors"
+              >
+                {isProcessingPayment ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                Confirm Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ================================================================= */}
+
+
       {/* CLASSIC SUB-HEADER WITH ADVANCED CONTROLS */}
       <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex items-center justify-between shadow-sm z-10 animate-in fade-in slide-in-from-top-2 duration-300">
         <div className="flex items-center gap-4">
@@ -448,8 +571,15 @@ export default function StudentProfileView() {
               <h2 className="text-erp-md font-bold text-gray-800 uppercase flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-cw-blue" /> Transaction History
               </h2>
+              {/* TRIGGER POS PAYMENT MODAL */}
               {student.financials.due > 0 && !isInactive && (
-                <button className="bg-cw-green text-white px-4 py-1.5 text-erp-sm font-bold rounded-erp shadow-erp-button hover:bg-[#006600] transition-colors flex items-center gap-1.5">
+                <button 
+                  onClick={() => {
+                    setPayAmount(student.financials.due.toString()); // Auto-fill balance due
+                    setIsPaymentModalOpen(true);
+                  }}
+                  className="bg-cw-green text-white px-4 py-1.5 text-erp-sm font-bold rounded-erp shadow-erp-button hover:bg-[#006600] transition-colors flex items-center gap-1.5 animate-bounce-short"
+                >
                   <Plus className="w-3.5 h-3.5" /> Collect Payment
                 </button>
               )}
@@ -466,28 +596,35 @@ export default function StudentProfileView() {
                 </tr>
               </thead>
               <tbody className="bg-white text-erp-base">
-                {student.financials.paid > 0 ? (
-                  <tr className="hover:bg-pastel-blueBg transition-colors border-b border-erp-borderLight">
-                    <td className="py-3 px-4 text-gray-700 font-medium">{student.admissionDate}</td>
-                    <td className="py-3 px-4 font-bold text-gray-900">Initial Admission Fee</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="bg-gray-100 text-gray-600 border border-gray-300 px-2 py-0.5 text-[11px] font-bold rounded-sm uppercase">{student.financials.paymentMode}</span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-cw-green">₹{student.financials.paid.toLocaleString()}</td>
-                    <td className="py-3 px-4 text-center">
-                      <button className="text-cw-blue hover:underline font-bold flex items-center justify-center gap-1 mx-auto text-[11px]">
-                        <Download className="w-3.5 h-3.5" /> Print
-                      </button>
-                    </td>
-                  </tr>
+                
+                {/* DYNAMIC DB TRANSACTIONS (FEE COLLECTIONS) */}
+                {student.transactions && student.transactions.length > 0 ? (
+                  student.transactions.map((tx: any) => (
+                    <tr key={tx.id} className="hover:bg-pastel-blueBg transition-colors border-b border-erp-borderLight">
+                      <td className="py-3 px-4 text-gray-700 font-medium">
+                        {new Date(tx.collection_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-gray-900">{tx.particulars}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="bg-gray-100 text-gray-600 border border-gray-300 px-2 py-0.5 text-[10px] font-bold rounded-sm uppercase tracking-wider">{tx.payment_mode}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-cw-green">₹{Number(tx.amount).toLocaleString()}</td>
+                      <td className="py-3 px-4 text-center">
+                        <button className="text-cw-blue hover:underline font-bold flex items-center justify-center gap-1 mx-auto text-[11px]">
+                          <Download className="w-3.5 h-3.5" /> Print
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 ) : (
                   <tr className="border-b border-erp-borderLight">
-                    <td colSpan={5} className="py-6 text-center text-gray-500 font-medium italic">No payments have been recorded yet.</td>
+                    <td colSpan={5} className="py-8 text-center text-gray-500 font-medium italic">No payments have been recorded in the ledger yet.</td>
                   </tr>
                 )}
                 
+                {/* PENDING BALANCE ROW */}
                 {student.financials.due > 0 && (
-                  <tr className={`${isInactive ? 'bg-gray-50' : 'bg-pastel-redBg'} hover:brightness-95 transition-colors`}>
+                  <tr className={`${isInactive ? 'bg-gray-50' : 'bg-pastel-redBg'} hover:brightness-95 transition-colors border-t border-erp-border`}>
                     <td className={`py-3 px-4 font-bold ${isInactive ? 'text-gray-500' : 'text-cw-red'}`}>Pending</td>
                     <td className={`py-3 px-4 font-bold ${isInactive ? 'text-gray-500' : 'text-cw-red'}`}>Remaining Ledger Balance</td>
                     <td className="py-3 px-4 text-center">
@@ -495,7 +632,9 @@ export default function StudentProfileView() {
                     </td>
                     <td className={`py-3 px-4 text-right font-bold ${isInactive ? 'text-gray-500 line-through' : 'text-cw-red'}`}>₹{student.financials.due.toLocaleString()}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`bg-white px-2 py-0.5 text-[10px] font-bold shadow-sm uppercase border ${isInactive ? 'text-gray-500 border-gray-300' : 'text-cw-red border-cw-red'}`}>{isInactive ? 'Frozen' : 'Overdue'}</span>
+                      <span className={`bg-white px-2 py-0.5 text-[10px] font-bold shadow-sm uppercase border ${isInactive ? 'text-gray-500 border-gray-300' : 'text-cw-red border-cw-red'}`}>
+                        {isInactive ? 'Frozen' : 'Overdue'}
+                      </span>
                     </td>
                   </tr>
                 )}

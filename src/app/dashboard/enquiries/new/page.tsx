@@ -9,7 +9,9 @@ import {
 import Link from "next/link";
 
 // IMPORT REAL DATABASE ACTIONS
-import { addStudentAction, updateStudentAction, getBranchSubjects, getStudentById } from "../../../actions/student-actions"; 
+import { getCourses } from "../../../actions/course-actions";
+import { getBatches } from "../../../actions/batch-actions"; // DEEP FIX: Added Batch Fetcher
+import { addStudentAction, updateStudentAction, getStudentById } from "../../../actions/student-actions"; 
 
 const steps = [
   { id: 1, name: "1. Student Details" },
@@ -17,13 +19,6 @@ const steps = [
   { id: 3, name: "3. Admission Details" },
   { id: 4, name: "4. Payment Details" },
   { id: 5, name: "5. Batch Details" },
-];
-
-// Fallback courses in case database has no subjects configured yet
-const mockCourseCatalog = [
-  { id: "mock-10th", name: "10th Std Foundation", fee: 15000 },
-  { id: "mock-11th", name: "XI Science Target", fee: 25000 },
-  { id: "mock-12th", name: "Class 12 PCM (Target 2027)", fee: 30000 }
 ];
 
 export default function NewStudentAdmissionPage() {
@@ -51,9 +46,11 @@ function AdmissionWizard() {
   const [isLoadingEditData, setIsLoadingEditData] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // DYNAMIC DB SUBJECTS & UI TOGGLES
-  const [dbSubjects, setDbSubjects] = useState<any[]>([]);
-  const [isFetchingCourses, setIsFetchingCourses] = useState(true);
+  // DYNAMIC MASTER DATABASE STATE (Courses & Batches)
+  const [masterCourses, setMasterCourses] = useState<any[]>([]);
+  const [masterBatches, setMasterBatches] = useState<any[]>([]);
+  const [isFetchingMasterData, setIsFetchingMasterData] = useState(true);
+  
   const [showSecondaryGuardian, setShowSecondaryGuardian] = useState(false);
   const [showInstallments, setShowInstallments] = useState(false);
 
@@ -82,32 +79,31 @@ function AdmissionWizard() {
   // DYNAMIC INSTALLMENT ARRAY
   const [installments, setInstallments] = useState<any[]>([]);
 
-  // FETCH REAL SUBJECTS
+  // 1. FETCH REAL COURSES & BATCHES FROM MASTER DATABASE
   useEffect(() => {
     let isMounted = true;
-    async function loadSubjects() {
-      setIsFetchingCourses(true);
+    async function loadMasterData() {
+      setIsFetchingMasterData(true);
       try {
-        const subjects = await getBranchSubjects();
+        const [courses, batches] = await Promise.all([
+          getCourses(),
+          getBatches() // DEEP FIX: Fetches real batches
+        ]);
         if (isMounted) {
-          if (subjects && subjects.length > 0) {
-            setDbSubjects(subjects);
-          } else {
-            setDbSubjects(mockCourseCatalog);
-          }
+          setMasterCourses(courses || []);
+          setMasterBatches(batches || []);
         }
       } catch (err) {
-        console.error("Failed to load subjects", err);
-        if (isMounted) setDbSubjects(mockCourseCatalog);
+        console.error("Failed to load master data", err);
       } finally {
-        if (isMounted) setIsFetchingCourses(false);
+        if (isMounted) setIsFetchingMasterData(false);
       }
     }
-    loadSubjects();
+    loadMasterData();
     return () => { isMounted = false; };
   }, []);
 
-  // DYNAMICALLY FETCH REAL STUDENT DATA WHEN IN EDIT MODE
+  // 2. DYNAMICALLY FETCH REAL STUDENT DATA WHEN IN EDIT MODE
   useEffect(() => {
     let isMounted = true;
 
@@ -120,15 +116,13 @@ function AdmissionWizard() {
         if (isMounted && res.success && res.data) {
           const s = res.data;
 
-          // Parse full name into First, Middle, and Last name
           const nameParts = (s.full_name || "").trim().split(" ");
           const firstName = nameParts[0] || "";
           const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
           const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
 
-          // Check for linked course
-          const linkedCourseId = s.student_subjects?.[0]?.subjects?.id || "";
-          const linkedCourseName = s.course_id || s.student_subjects?.[0]?.subjects?.name || "";
+          const linkedCourseId = s.student_subjects?.[0]?.subjects?.id || ""; 
+          const linkedCourseName = s.course_id || "";
 
           if (s.sec_guardian_name) {
             setShowSecondaryGuardian(true);
@@ -159,11 +153,11 @@ function AdmissionWizard() {
             admissionDate: s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             courseId: linkedCourseId,
             courseName: linkedCourseName,
-            baseFee: Number(s.gross_fee) || 30000,
+            baseFee: Number(s.gross_fee) || 0,
             discount: Number(s.discount_amount) || 0,
             amountPaid: Number(s.amount_paid) || 0,
             paymentMode: s.payment_mode || "Cash",
-            batch: s.batch_id || ""
+            batch: s.batch_id || "" // Automatically selects their current batch!
           });
         }
       } catch (err) {
@@ -217,14 +211,14 @@ function AdmissionWizard() {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  // HANDLE COURSE SELECTION
+  // HANDLE MASTER COURSE SELECTION
   const handleCourseSelect = (selectedId: string) => {
-    const selectedCourse = dbSubjects.find(sub => sub.id === selectedId);
+    const selectedCourse = masterCourses.find(c => c.id === selectedId);
     setFormData(prev => ({
       ...prev,
       courseId: selectedId,
       courseName: selectedCourse ? selectedCourse.name : "",
-      baseFee: selectedCourse?.fee || selectedCourse?.baseFee || 30000, 
+      baseFee: selectedCourse ? Number(selectedCourse.fee) : 0, 
       discount: 0,
       amountPaid: 0
     }));
@@ -232,16 +226,13 @@ function AdmissionWizard() {
     setShowInstallments(false);
   };
 
-  // SMART INSTALLMENT GENERATOR
   const generateInstallments = () => {
     setShowInstallments(true);
     if (balanceDue > 0) {
       const half = Math.floor(balanceDue / 2);
       const remainder = balanceDue - half;
-      
       const date1 = new Date(); date1.setMonth(date1.getMonth() + 1);
       const date2 = new Date(); date2.setMonth(date2.getMonth() + 2);
-      
       setInstallments([
         { id: Date.now() + 1, date: date1.toISOString().split('T')[0], amount: half },
         { id: Date.now() + 2, date: date2.toISOString().split('T')[0], amount: remainder }
@@ -278,7 +269,6 @@ function AdmissionWizard() {
     try {
       const submitData = new FormData();
       
-      // 1. Identity & Demographics
       submitData.append("roll_number", formData.rollNo);
       submitData.append("full_name", `${formData.firstName} ${formData.middleName} ${formData.lastName}`.trim());
       submitData.append("parent_phone", formData.guardianPhone || formData.phone);
@@ -289,7 +279,6 @@ function AdmissionWizard() {
       submitData.append("category", formData.category);
       submitData.append("government_id", formData.aadhar);
 
-      // 2. Guardians
       submitData.append("guardian_name", formData.guardianName);
       submitData.append("guardian_relation", formData.guardianRelation);
       submitData.append("guardian_email", formData.guardianEmail);
@@ -298,23 +287,19 @@ function AdmissionWizard() {
       submitData.append("sec_guardian_phone", formData.secGuardianPhone);
       submitData.append("sec_guardian_email", formData.secGuardianEmail);
 
-      // 3. Batch & Academics
       submitData.append("batch_id", formData.batch);
       submitData.append("course_name", formData.courseName);
 
-      // FK Safety Check for Courses
       const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(formData.courseId);
       if (formData.courseId && isUUID) {
         submitData.append("subject_ids", formData.courseId);
       }
 
-      // 4. Financials
       submitData.append("gross_fee", formData.baseFee.toString());
       submitData.append("discount_amount", formData.discount.toString());
       submitData.append("amount_paid", formData.amountPaid.toString());
       submitData.append("payment_mode", formData.paymentMode);
 
-      // ROUTE TO UPDATE OR INSERT BASED ON MODE
       let response;
       if (isEditMode && editId) {
         response = await updateStudentAction(editId, submitData);
@@ -360,7 +345,6 @@ function AdmissionWizard() {
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-[1200px] mx-auto bg-white border border-erp-border shadow-sm rounded-erp flex flex-col min-h-[700px]">
           
-          {/* ERROR BANNER */}
           {saveError && (
             <div className="bg-pastel-redBg border-b border-pastel-redBorder p-3 flex items-start gap-2 animate-in slide-in-from-top-2 duration-300">
               <AlertTriangle className="w-5 h-5 text-cw-red shrink-0 mt-0.5" />
@@ -370,7 +354,6 @@ function AdmissionWizard() {
             </div>
           )}
 
-          {/* WIZARD TABS HEADER */}
           <div className="flex border-b border-erp-border bg-erp-header overflow-x-auto hide-scrollbar">
             {steps.map((step) => {
               const isActive = currentStep === step.id;
@@ -392,10 +375,9 @@ function AdmissionWizard() {
             })}
           </div>
 
-          {/* CONTENT WORKSPACE */}
           <div className="flex-1 p-8 bg-white relative">
             
-            {/* STEP 1: IDENTITY DETAILS */}
+            {/* STEP 1: IDENTITY */}
             {currentStep === 1 && (
               <div className="flex gap-10 animate-in fade-in duration-200">
                 <div className="flex-1 space-y-3 max-w-2xl">
@@ -412,10 +394,7 @@ function AdmissionWizard() {
                     label="Roll No." 
                     placeholder="Enter roll number" 
                     value={formData.rollNo}
-                    onChange={(e) => {
-                      setSaveError(null);
-                      setFormData({...formData, rollNo: e});
-                    }}
+                    onChange={(e) => { setSaveError(null); setFormData({...formData, rollNo: e}); }}
                     disabled={isEditMode}
                     required
                   />
@@ -455,7 +434,7 @@ function AdmissionWizard() {
               </div>
             )}
 
-            {/* STEP 2: GUARDIAN DETAILS */}
+            {/* STEP 2: GUARDIANS */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-in fade-in duration-200 max-w-2xl">
                 <div className="bg-erp-header border border-erp-border p-6 rounded-erp shadow-sm">
@@ -496,7 +475,7 @@ function AdmissionWizard() {
               </div>
             )}
 
-            {/* STEP 3: ACADEMIC & FINANCIAL ASSIGNMENT */}
+            {/* STEP 3: COURSES */}
             {currentStep === 3 && (
               <div className="space-y-8 max-w-4xl animate-in fade-in duration-200">
                 <div>
@@ -522,14 +501,18 @@ function AdmissionWizard() {
                             value={formData.courseId}
                             onChange={(e) => { setSaveError(null); handleCourseSelect(e.target.value); }}
                             className="w-full bg-pastel-yellowBg border border-erp-border font-bold cursor-pointer text-cw-blueDark px-2 py-1"
-                            disabled={isFetchingCourses}
+                            disabled={isFetchingMasterData}
                           >
                             <option value="">-- Assign Master Course --</option>
-                            {isFetchingCourses ? (
-                              <option disabled>Fetching subjects from database...</option>
+                            {isFetchingMasterData ? (
+                              <option disabled>Fetching courses from database...</option>
+                            ) : masterCourses.length === 0 ? (
+                              <option disabled>No courses found. Create one in Course Master.</option>
                             ) : (
-                              dbSubjects.map(sub => (
-                                <option key={sub.id} value={sub.id}>{sub.name}</option>
+                              masterCourses.map(course => (
+                                <option key={course.id} value={course.id}>
+                                  {course.name} (Base Fee: ₹{course.fee})
+                                </option>
                               ))
                             )}
                           </select>
@@ -577,7 +560,7 @@ function AdmissionWizard() {
               </div>
             )}
 
-            {/* STEP 4: POS & PAYMENT COLLECTION */}
+            {/* STEP 4: POS */}
             {currentStep === 4 && (
               <div className="flex gap-8 animate-in fade-in duration-200">
                 <div className="flex-1 space-y-6">
@@ -640,7 +623,6 @@ function AdmissionWizard() {
                       </div>
                     </div>
 
-                    {/* SMART INSTALLMENT LEDGER */}
                     {showInstallments && balanceDue > 0 && (
                       <div className="p-6 bg-pastel-blueBg animate-in fade-in slide-in-from-top-4 duration-300">
                         <div className="flex justify-between items-end mb-4 border-b border-pastel-blueBorder pb-2">
@@ -715,7 +697,9 @@ function AdmissionWizard() {
               </div>
             )}
 
-            {/* STEP 5: BATCH ASSIGNMENT */}
+            {/* ========================================== */}
+            {/* STEP 5: DEEPLY INTEGRATED BATCH ASSIGNMENT */}
+            {/* ========================================== */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="flex items-start gap-4">
@@ -725,12 +709,23 @@ function AdmissionWizard() {
                   <select 
                     value={formData.batch}
                     onChange={(e) => { setSaveError(null); setFormData({...formData, batch: e.target.value}); }}
-                    className="w-[350px] font-bold text-cw-blueDark cursor-pointer border border-erp-border px-2 py-1 outline-none focus:border-cw-blue"
+                    className="w-[350px] font-bold text-cw-blueDark cursor-pointer border border-erp-border px-2 py-1 outline-none focus:border-cw-blue shadow-inner bg-white"
+                    disabled={isFetchingMasterData}
                   >
                     <option value="">-- Verify & Select Operational Batch --</option>
-                    <option value="10th-2026">10th Std (2026-27)</option>
-                    <option value="11th-sci-2026">XI Science B1</option>
-                    <option value="12th-pcm-2026">Class 12 PCM (Target 2027)</option>
+                    
+                    {/* LOOP OVER LIVE DATABASE BATCHES */}
+                    {isFetchingMasterData ? (
+                      <option disabled>Fetching live batches from database...</option>
+                    ) : masterBatches.length === 0 ? (
+                      <option disabled>No active batches found in Master.</option>
+                    ) : (
+                      masterBatches.map(batch => (
+                        <option key={batch.id} value={batch.name}>
+                          {batch.name} ({batch.academic_year})
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 
@@ -805,11 +800,11 @@ function Field({
       </label>
       <div className="flex-1 max-w-sm">
         {isSelect ? (
-          <select disabled={disabled} {...valueProps} onChange={(e) => onChange && onChange(e.target.value)} className="w-full cursor-pointer font-medium text-gray-900 border border-erp-border px-2 py-1 focus:border-cw-blue outline-none">
+          <select disabled={disabled} {...valueProps} onChange={(e) => onChange && onChange(e.target.value)} className="w-full cursor-pointer font-medium text-gray-900 border border-erp-border px-2 py-1 focus:border-cw-blue outline-none shadow-inner bg-white">
             {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         ) : (
-          <input type={type} {...valueProps} onChange={(e) => onChange && onChange(e.target.value)} placeholder={placeholder} disabled={disabled} className="w-full font-medium text-gray-900 border border-erp-border px-2 py-1 focus:border-cw-blue outline-none" />
+          <input type={type} {...valueProps} onChange={(e) => onChange && onChange(e.target.value)} placeholder={placeholder} disabled={disabled} className="w-full font-medium text-gray-900 border border-erp-border px-2 py-1 focus:border-cw-blue outline-none shadow-inner" />
         )}
       </div>
     </div>

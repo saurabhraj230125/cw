@@ -41,7 +41,7 @@ export async function getStudents() {
 }
 
 // ==========================================
-// 2. FETCH ALL UNIQUE BATCHES (This fixes your error!)
+// 2. FETCH ALL UNIQUE BATCHES
 // ==========================================
 export async function getAllBatches() {
   const supabase = await createClient();
@@ -169,6 +169,16 @@ export async function addStudentAction(formData: FormData) {
     await supabase.from("student_subjects").insert(enrollments);
   }
 
+  // If there's an initial payment during admission, record it in the ledger!
+  if (insertData.amount_paid > 0 && newStudent) {
+    await supabase.from("fee_collections").insert([{
+      student_id: newStudent.id,
+      amount: insertData.amount_paid,
+      payment_mode: insertData.payment_mode,
+      particulars: "Initial Admission Fee"
+    }]);
+  }
+
   revalidatePath("/dashboard/students");
   return { success: true };
 }
@@ -248,12 +258,13 @@ export async function updateStudentAction(studentId: string, formData: FormData)
 }
 
 // ==========================================
-// 6. FETCH SINGLE STUDENT BY ID (Profile View)
+// 6. FETCH SINGLE STUDENT BY ID (Deeply Updated for POS)
 // ==========================================
 export async function getStudentById(studentId: string) {
   try {
     const supabase = await createClient();
     
+    // DEEP FIX: Added fee_collections to the select query to build the Transaction History
     const { data, error } = await supabase
       .from("students")
       .select(`
@@ -264,6 +275,13 @@ export async function getStudentById(studentId: string) {
         attendance (
           status,
           date
+        ),
+        fee_collections (
+          id,
+          amount,
+          payment_mode,
+          particulars,
+          collection_date
         )
       `)
       .eq("id", studentId)
@@ -327,6 +345,7 @@ export async function deleteStudentAction(studentId: string) {
   // CRITICAL: Prevent Foreign Key Crashes by wiping dependencies first
   await supabase.from("attendance").delete().eq("student_id", studentId);
   await supabase.from("student_subjects").delete().eq("student_id", studentId);
+  await supabase.from("fee_collections").delete().eq("student_id", studentId); // Wipes payment history safely
 
   // Safely wipe the student record
   const { error } = await supabase
@@ -341,4 +360,52 @@ export async function deleteStudentAction(studentId: string) {
 
   revalidatePath("/dashboard/students");
   return { success: true };
+}
+
+// ==========================================
+// 9. PROCESS FEE PAYMENT (NEW POS SYSTEM)
+// ==========================================
+export async function collectPaymentAction(studentId: string, amount: number, mode: string, particulars: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) throw new Error("Unauthorized access.");
+
+    // 1. Fetch current paid amount
+    const { data: student, error: fetchError } = await supabase
+      .from("students")
+      .select("amount_paid")
+      .eq("id", studentId)
+      .single();
+      
+    if (fetchError) throw new Error("Could not fetch student balance.");
+
+    const currentPaid = Number(student?.amount_paid || 0);
+    const newTotalPaid = currentPaid + amount;
+
+    // 2. Update Master Student Record
+    const { error: updateError } = await supabase
+      .from("students")
+      .update({ amount_paid: newTotalPaid })
+      .eq("id", studentId);
+      
+    if (updateError) throw new Error("Failed to update student master balance.");
+
+    // 3. Write individual receipt to Ledger
+    const { error: insertError } = await supabase.from("fee_collections").insert([{
+      student_id: studentId,
+      amount: amount,
+      payment_mode: mode,
+      particulars: particulars || "Fee Installment"
+    }]);
+    
+    if (insertError) throw new Error("Failed to write receipt to ledger.");
+
+    revalidatePath(`/dashboard/students/${studentId}`);
+    revalidatePath(`/dashboard/fees`); // Refresh the master fee ledger too
+    return { success: true };
+  } catch (error: any) {
+    throw new Error(error.message || "Failed to process payment.");
+  }
 }
