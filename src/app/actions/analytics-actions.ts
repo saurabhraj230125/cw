@@ -31,7 +31,9 @@ export async function getMasterAnalytics() {
 
   const students = studentsRes.data || [];
   const tests = testsRes.data || [];
-  const attempts = attemptsRes.data || [];
+  
+  // CAST AS ANY[] TO BYPASS VERCEL'S STRICT SUPABASE INFERENCE
+  const attempts = (attemptsRes.data || []) as any[];
 
   // ==========================================
   // DATA CRUNCHING ENGINE
@@ -58,8 +60,12 @@ export async function getMasterAnalytics() {
   const batchStats: Record<string, { totalPercentage: number; count: number }> = {};
   
   attempts.forEach(a => {
-    const batchName = a.students?.batch_id || "Unassigned";
-    const maxMarks = a.batch_tests?.total_marks || 1; // Prevent divide by zero
+    // SAFE EXTRACTOR: If Supabase returns an array, get the first item. Otherwise, use the object.
+    const studentData = Array.isArray(a.students) ? a.students[0] : a.students;
+    const testData = Array.isArray(a.batch_tests) ? a.batch_tests[0] : a.batch_tests;
+
+    const batchName = studentData?.batch_id || "Unassigned";
+    const maxMarks = testData?.total_marks || 1; // Prevent divide by zero
     const percentage = (Math.max(0, a.score) / maxMarks) * 100; // Cap floor at 0%
 
     if (!batchStats[batchName]) batchStats[batchName] = { totalPercentage: 0, count: 0 };
@@ -76,11 +82,14 @@ export async function getMasterAnalytics() {
   const studentStats: Record<string, { name: string; batch: string; totalScore: number; examsTaken: number }> = {};
   
   attempts.forEach(a => {
+    // SAFE EXTRACTOR
+    const studentData = Array.isArray(a.students) ? a.students[0] : a.students;
+
     const sId = a.student_id;
     if (!studentStats[sId]) {
       studentStats[sId] = { 
-        name: a.students?.full_name || "Unknown", 
-        batch: a.students?.batch_id || "Unassigned", 
+        name: studentData?.full_name || "Unknown", 
+        batch: studentData?.batch_id || "Unassigned", 
         totalScore: 0, 
         examsTaken: 0 
       };
