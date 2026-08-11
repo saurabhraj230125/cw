@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
-import { OnboardingWizard } from "../../components/onboarding/OnboardingWizard";
-
+import OnboardingWizard from "./OnboardingWizard"; // FIXED: Exact same folder import
 
 export default async function OnboardingPage() {
   const supabase = await createClient();
