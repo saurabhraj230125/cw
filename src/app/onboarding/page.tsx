@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "../../lib/supabase/server";
 import { OnboardingWizard } from "../../components/onboarding/OnboardingWizard";
 
+
 export default async function OnboardingPage() {
   const supabase = await createClient();
 
@@ -21,6 +22,7 @@ export default async function OnboardingPage() {
     .limit(1)
     .maybeSingle();
 
+  // If they already have a membership, redirect them to the dashboard
   if (membership) {
     redirect("/dashboard");
   }

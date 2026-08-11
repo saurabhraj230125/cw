@@ -2,23 +2,21 @@ import { NextResponse } from 'next/server'
 import { createClient } from '../../../lib/supabase/server'
 
 export async function GET(request: Request) {
-  // 1. Get the URL and the secure code sent by Supabase
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  
+  // Automatically redirect to onboarding for new users, or dashboard for existing ones
+  const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
-    // 2. Initialize the Supabase Server Client
     const supabase = await createClient()
-    
-    // 3. Exchange the code for a secure, HTTP-only session cookie
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (error) {
-      console.error("Auth session error:", error.message)
-      return NextResponse.redirect(new URL('/login?error=true', requestUrl.origin))
+    if (!error) {
+      return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
-  // 4. Redirect the authenticated user to the Dashboard (or Onboarding)
-  return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
+  // If the code is invalid or expired, kick them back to login
+  return NextResponse.redirect(`${origin}/login?error=OAuth_Failed`)
 }

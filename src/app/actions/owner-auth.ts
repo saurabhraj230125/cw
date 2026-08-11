@@ -1,64 +1,86 @@
 "use server";
 
 import { createClient } from "../../lib/supabase/server";
-import { cookies } from "next/headers";
 
+// ==========================================
+// 1. STANDARD SECURE LOGIN
+// ==========================================
 export async function loginOwnerAction(email: string, pass: string) {
   const supabase = await createClient();
-  
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password: pass,
-  });
-
+  const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
   if (error) throw new Error(error.message);
   return { success: true };
 }
 
-export async function registerFreeTrialAction(instituteName: string, email: string, pass: string) {
+// ==========================================
+// 2. CREATE ACCOUNT ONLY (Step 1 of SaaS Flow)
+// ==========================================
+export async function signUpFreeTrialAction(email: string, pass: string) {
   const supabase = await createClient();
 
-  // 1. Create the Auth User
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password: pass,
   });
 
-  if (authError) throw new Error(authError.message);
+  if (authError) throw new Error(`Auth Error: ${authError.message}`);
   if (!authData.user) throw new Error("Failed to create account.");
 
-  const userId = authData.user.id;
+  if (authData.user.identities && authData.user.identities.length === 0) {
+    throw new Error("This email is already registered. Please click 'Log In Here' below.");
+  }
 
-  // 2. Create the Institute (Gets the 7-Day Trial automatically from SQL Default)
+  return { success: true };
+}
+
+// ==========================================
+// 3. COMPLETE ONBOARDING (Step 2 of SaaS Flow)
+// ==========================================
+export async function completeOnboardingAction(instituteName: string) {
+  const supabase = await createClient();
+  
+  // Verify they are logged in before allowing them to create an institute
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Authentication lost. Please log in again.");
+
+  // Create Institute
   const { data: instData, error: instError } = await supabase
     .from("institutes")
     .insert([{ name: instituteName }])
     .select("id")
     .single();
 
-  if (instError) throw new Error("Failed to configure Institute.");
-  const instId = instData.id;
-
-  // 3. Create the Main Branch
+  if (instError) {
+    console.error("SUPABASE INSTITUTE ERROR:", instError);
+    throw new Error(`Database Error (Institute): ${instError.message}`);
+  }
+  
+  // Create Main Branch
   const { data: branchData, error: branchError } = await supabase
     .from("branches")
-    .insert([{ institute_id: instId, name: "Main Branch", is_head_office: true }])
+    .insert([{ institute_id: instData.id, name: "Main Branch", is_head_office: true }])
     .select("id")
     .single();
 
-  if (branchError) throw new Error("Failed to configure Main Branch.");
+  if (branchError) {
+    console.error("SUPABASE BRANCH ERROR:", branchError);
+    throw new Error(`Database Error (Branch): ${branchError.message}`);
+  }
 
-  // 4. Link the User as the Admin of this Institute
+  // Link Admin
   const { error: memberError } = await supabase
     .from("core_memberships")
     .insert([{
-      user_id: userId,
-      institute_id: instId,
+      user_id: user.id,
+      institute_id: instData.id,
       branch_id: branchData.id,
       role: 'admin'
     }]);
 
-  if (memberError) throw new Error("Failed to setup Admin privileges.");
+  if (memberError) {
+    console.error("SUPABASE MEMBERSHIP ERROR:", memberError);
+    throw new Error(`Database Error (Membership): ${memberError.message}`);
+  }
 
   return { success: true };
 }
