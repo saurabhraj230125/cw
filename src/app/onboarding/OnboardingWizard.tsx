@@ -9,7 +9,7 @@ import {
   Database, Lock, LayoutDashboard, FileText,
   MapPin, Users, Target, BookOpen, Wallet, CalendarClock
 } from "lucide-react";
-import { completeOnboardingAction } from "../actions/owner-auth";
+import { completeOnboardingAction } from "../../app/actions/owner-auth";
 
 // Define the steps for our dynamic left-hand guide
 const WIZARD_STEPS = [
@@ -78,8 +78,14 @@ export default function OnboardingWizard() {
     setStep(5); // Move to final provisioning screen
 
     try {
-      // 1. Trigger backend DB creation (You can update this action later to accept the new data)
-      await completeOnboardingAction(cleanName);
+      // 1. Trigger backend DB creation passing ALL collected data
+      await completeOnboardingAction(
+        cleanName, 
+        location, 
+        category, 
+        studentCount, 
+        mainProblem
+      );
       
       // 2. Cinematic Loading Sequence
       setTimeout(() => setProvisionStep(1), 1200);
@@ -217,7 +223,7 @@ export default function OnboardingWizard() {
                     <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">Official Institute Name</label>
                     <div className="relative">
                       <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input type="text" value={instituteName} onChange={(e) => setInstituteName(e.target.value)} placeholder="e.g. Apex Academy" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
+                      <input type="text" value={instituteName} onChange={(e) => setInstituteName(e.target.value)} placeholder="e.g. Apex Academy" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-lg text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
                     </div>
                   </div>
                   <div className="space-y-2">

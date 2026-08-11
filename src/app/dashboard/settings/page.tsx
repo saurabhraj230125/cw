@@ -4,41 +4,65 @@ import { useState } from "react";
 import { 
   Save, RefreshCw, CreditCard, Download, 
   CheckCircle2, Smartphone, ShieldCheck, Zap,
-  Clock, AlertTriangle
+  Clock, AlertTriangle, ArrowLeft, Building2, Wallet, CreditCard as CardIcon
 } from "lucide-react";
 
-export default function SettingsPage() {
+export default function SettingsClient({
+  userEmail = "admin@institute.com",
+  instituteName = "My Institute",
+  instituteSlug = "my-institute",
+  city = "Bokaro"
+}: {
+  userEmail?: string;
+  instituteName?: string;
+  instituteSlug?: string;
+  city?: string;
+}) {
   const [activeTab, setActiveTab] = useState("SaaS Billing");
   const [isSaving, setIsSaving] = useState(false);
   
-  // Simulated State: Set to true to see the 7-Day Free Trial view
+  // Checkout & Billing State
   const isFreeTrial = true; 
-  const selectedPlanPrice = 14999; // Defaulting to PRO Plan price
-  const addonPrice = 0; // Keeping addons separate for the total
+  const [isCheckout, setIsCheckout] = useState(false);
+  const [selectedPlanPrice, setSelectedPlanPrice] = useState(1499); 
+  const [selectedPlanName, setSelectedPlanName] = useState("Starter Plan");
+  
+  // IRCTC Style Payment State
+  const [paymentMethod, setPaymentMethod] = useState("multiple");
+  const [selectedGateway, setSelectedGateway] = useState("razorpay");
 
   const handleSave = () => {
     setIsSaving(true);
     setTimeout(() => setIsSaving(false), 1200);
   };
 
+  const initiateCheckout = (name: string, price: number) => {
+    setSelectedPlanName(name);
+    setSelectedPlanPrice(price);
+    setIsCheckout(true);
+  };
+
   return (
-    <main className="min-h-screen bg-white font-sans flex flex-col">
+    <main className="min-h-screen bg-[#f3f4f6] font-sans flex flex-col">
       
       {/* 1. CLASSIC SUB-HEADER */}
-      <div className="px-4 py-2 border-b border-gray-300 bg-white shrink-0">
-        <h2 className="text-[17px] text-black font-normal">Institute Master Settings</h2>
+      <div className="px-4 py-3 border-b border-gray-300 bg-white shrink-0 flex justify-between items-center shadow-sm">
+        <h2 className="text-[17px] text-black font-semibold">Institute Master Settings</h2>
+        <span className="text-[12px] font-bold text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+          ID: {instituteSlug.toUpperCase()}
+        </span>
       </div>
 
       {/* 2. CLASSIC TAB ROW */}
-      <div className="px-4 pt-2 bg-[#f5f5f5] border-b border-gray-300 flex gap-1 shrink-0 overflow-x-auto hide-scrollbar">
+      <div className="px-4 pt-3 bg-white border-b border-gray-300 flex gap-1 shrink-0 overflow-x-auto hide-scrollbar">
         {["General", "Branding & White-Label", "Integrations", "SaaS Billing"].map((tab) => (
           <button 
             key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 text-[12px] font-bold border-t border-l border-r rounded-t-sm transition-colors whitespace-nowrap ${
+            onClick={() => { setActiveTab(tab); setIsCheckout(false); }}
+            className={`px-5 py-2 text-[13px] font-bold border-t border-l border-r rounded-t-md transition-colors whitespace-nowrap ${
               activeTab === tab 
-                ? "bg-white border-gray-300 text-[#0055a5] -mb-[1px] shadow-[0_-2px_0_#0055a5]" 
-                : "bg-[#e8e8e8] border-[#d4d4d4] text-gray-600 hover:bg-[#f0f0f0]"
+                ? "bg-[#f8fafc] border-gray-300 text-[#0055a5] -mb-[1px] shadow-[0_-3px_0_#0055a5_inset]" 
+                : "bg-white border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800"
             }`}
           >
             {tab}
@@ -47,283 +71,322 @@ export default function SettingsPage() {
       </div>
 
       {/* 3. SETTINGS WORKSPACE */}
-      <div className="flex-1 p-4 bg-white overflow-auto">
+      <div className="flex-1 p-4 md:p-6 bg-[#f8fafc] overflow-auto">
         
         {/* ======================================================== */}
-        {/* GENERAL TAB (Unchanged)                                  */}
+        {/* GENERAL TAB                                              */}
         {/* ======================================================== */}
         {activeTab === "General" && (
-          <div className="max-w-[1200px] border border-gray-300 rounded-sm bg-[#fafafa] shadow-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="max-w-[1200px] border border-gray-300 rounded-md bg-white shadow-sm overflow-hidden animate-in fade-in duration-200">
             <div className="p-4 sm:p-6 space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-2">
                 <div>
-                  <Field label="Institute Reg No" required defaultValue="FQ-2026-001" />
-                  <Field label="Institute Name" required defaultValue="Future Q Academy" />
-                  <Field label="System Domain" required defaultValue="futureq.coachingwala.com" disabled />
+                  <Field label="Institute Reg No" required defaultValue={instituteSlug.toUpperCase()} disabled />
+                  <Field label="Institute Name" required defaultValue={instituteName} />
+                  <Field label="System Domain" required defaultValue={`${instituteSlug}.coachingwala.com`} disabled />
                   <Field label="Establishment Year" defaultValue="2026" />
                   <Field label="Institute Type" isSelect options={["Coaching Center", "School", "Tutor"]} />
                 </div>
                 <div>
-                  <Field label="Director/Owner Name" required defaultValue="Saurabh Raj" />
-                  <Field label="Support Email Id" required defaultValue="admin@futureq.com" type="email" />
-                  <Field label="Support Mobile No" required defaultValue="6306814355" />
+                  <Field label="Director/Owner Name" required defaultValue="Admin User" />
+                  <Field label="Support Email Id" required defaultValue={userEmail} disabled type="email" />
+                  <Field label="Support Mobile No" required defaultValue="+91" />
                   <Field label="Alternate Phone" defaultValue="" />
                   <Field label="Current Session" isSelect options={["2026-27", "2025-26"]} />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-6 border-t border-gray-300">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-6 border-t border-gray-200">
                 <div>
-                  <h3 className="text-[16px] text-black font-normal mb-4">Branch / Correspondence Address</h3>
-                  <Field label="Address" required isTextArea defaultValue="QR.NO. - 4009, SECTOR - 4C, NEAR DPS BOKARO, LAXMI MARKET, B.S.CITY" />
-                  <Field label="City" required isSelect options={["BOKARO", "RANCHI", "DHANBAD"]} />
-                  <Field label="State" required isSelect options={["JHARKHAND", "BIHAR", "WEST BENGAL"]} />
-                  <Field label="Country" required isSelect options={["India"]} />
-                  <Field label="Pin" required defaultValue="827004" />
+                  <h3 className="text-[14px] text-[#0055a5] font-bold mb-4 uppercase tracking-wider">Branch / Correspondence Address</h3>
+                  <Field label="Address" required isTextArea defaultValue="" />
+                  <Field label="City" required isSelect options={[city.toUpperCase(), "RANCHI", "DHANBAD"]} />
+                  <Field label="State" required isSelect options={["JHARKHAND", "BIHAR", "UTTAR PRADESH"]} />
+                  <Field label="Pin" required defaultValue="" />
                 </div>
                 <div>
-                  <h3 className="text-[16px] text-black font-normal mb-4">Head Office / Permanent Address</h3>
-                  <Field label="Address" required isTextArea defaultValue="SHIVPUR SHABHAJGANJ JUNGLE SALIGRAM SHAKTINAGAR GORAKHPUR UTTARPRADESH" />
-                  <Field label="City" required isSelect options={["GORAKHPUR", "LUCKNOW", "VARANASI"]} />
+                  <h3 className="text-[14px] text-[#0055a5] font-bold mb-4 uppercase tracking-wider">Head Office Address</h3>
+                  <Field label="Address" required isTextArea defaultValue="" />
+                  <Field label="City" required isSelect options={[city.toUpperCase(), "LUCKNOW", "VARANASI"]} />
                   <Field label="State" required isSelect options={["UTTAR PRADESH", "DELHI", "BIHAR"]} />
-                  <Field label="Country" required isSelect options={["India"]} />
-                  <Field label="Pin" required defaultValue="273014" />
+                  <Field label="Pin" required defaultValue="" />
                 </div>
               </div>
             </div>
-            <div className="bg-[#eeeeee] border-t border-gray-300 px-6 py-3 flex justify-center gap-4">
-              <button className="bg-[#f5f5f5] border border-gray-400 text-gray-800 px-6 py-1.5 text-[13px] font-bold hover:bg-white shadow-sm flex items-center gap-1.5 transition-colors">
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-4">
+              <button className="bg-white border border-gray-300 text-gray-700 px-6 py-2 text-[13px] font-bold hover:bg-gray-50 shadow-sm flex items-center gap-1.5 transition-colors rounded-sm">
                 <RefreshCw className="w-3.5 h-3.5" /> Reset
               </button>
-              <button onClick={handleSave} disabled={isSaving} className="bg-[#0055a5] border border-[#004080] text-white px-8 py-1.5 text-[13px] font-bold hover:bg-[#004080] shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-70">
-                {isSaving ? "Updating..." : <><Save className="w-3.5 h-3.5" /> Update Profile</>}
+              <button onClick={handleSave} disabled={isSaving} className="bg-[#0055a5] border border-[#004080] text-white px-8 py-2 text-[13px] font-bold hover:bg-[#004080] shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-70 rounded-sm">
+                {isSaving ? "Updating..." : <><Save className="w-3.5 h-3.5" /> Save Changes</>}
               </button>
             </div>
           </div>
         )}
 
         {/* ======================================================== */}
-        {/* SAAS BILLING TAB - WITH NEW 7-DAY TRIAL LOGIC            */}
+        {/* SAAS BILLING TAB                                         */}
         {/* ======================================================== */}
         {activeTab === "SaaS Billing" && (
-          <div className="max-w-[1200px] animate-in fade-in duration-200 space-y-6">
+          <div className="max-w-[1200px] animate-in fade-in duration-200">
             
-            {/* DYNAMIC SUBSCRIPTION STATUS */}
-            {isFreeTrial ? (
-              <div className="border border-[#e65100] bg-[#fff3e0] shadow-sm flex flex-col md:flex-row items-center justify-between">
-                <div className="p-4 flex items-center gap-4">
-                  <div className="h-12 w-12 bg-[#ffe0b2] border border-[#ffb74d] rounded-full flex items-center justify-center shrink-0">
-                    <Clock className="w-6 h-6 text-[#e65100]" />
-                  </div>
-                  <div>
-                    <h3 className="text-[15px] font-bold text-gray-900 uppercase tracking-wide flex items-center gap-2">
-                      Active Plan: 7-DAY FREE TRIAL
-                    </h3>
-                    <div className="text-[12px] font-semibold text-[#cc0000] mt-0.5 flex gap-4">
-                      <span>Expires: <span className="text-black">10 Aug 2026</span></span>
-                      <span className="flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Upgrade required to avoid suspension</span>
+            {!isCheckout ? (
+              <div className="space-y-6">
+                
+                {/* DYNAMIC TRIAL BANNER */}
+                {isFreeTrial && (
+                  <div className="border border-[#e65100] bg-[#fff3e0] shadow-sm flex flex-col md:flex-row items-center justify-between rounded-sm">
+                    <div className="p-4 flex items-center gap-4">
+                      <div className="h-10 w-10 bg-[#ffe0b2] border border-[#ffb74d] rounded-full flex items-center justify-center shrink-0">
+                        <Clock className="w-5 h-5 text-[#e65100]" />
+                      </div>
+                      <div>
+                        <h3 className="text-[14px] font-bold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                          Active Plan: 7-DAY FREE TRIAL
+                        </h3>
+                        <div className="text-[12px] font-semibold text-[#cc0000] mt-0.5 flex gap-4">
+                          <span>Expires: <span className="text-black">18 Aug 2026</span></span>
+                          <span className="flex items-center gap-1 hidden sm:flex"><AlertTriangle className="w-3 h-3" /> Upgrade required to unlock DPPs & Analytics</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-[#ffecb3] border-l border-[#ffcc80] md:min-w-[280px] w-full md:w-auto flex flex-col justify-center shrink-0">
+                      <span className="text-[11px] font-bold text-[#e65100] uppercase">Trial Countdown</span>
+                      <div className="w-full bg-white h-2 mt-1.5 mb-1.5 border border-[#ffb74d] rounded-full overflow-hidden">
+                        <div className="bg-[#e65100] h-full" style={{ width: '100%' }}></div>
+                      </div>
+                      <div className="flex justify-between text-[11px] font-bold text-gray-800">
+                        <span>7 Days Remaining</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="p-4 bg-[#ffecb3] border-l border-[#ffcc80] md:min-w-[280px] flex flex-col justify-center shrink-0">
-                  <span className="text-[11px] font-bold text-[#e65100] uppercase">Trial Countdown</span>
-                  <div className="w-full bg-white h-2 mt-1.5 mb-1.5 border border-[#ffb74d]">
-                    {/* Progress bar showing 7 days full, slowly reducing */}
-                    <div className="bg-[#e65100] h-full" style={{ width: '100%' }}></div>
+                )}
+
+                {/* DETAILED PRICING MATRIX */}
+                <div className="border border-gray-300 bg-white shadow-sm rounded-sm overflow-hidden">
+                  <div className="bg-[#f8fafc] border-b border-gray-300 px-5 py-4 flex justify-between items-center">
+                    <h2 className="text-[14px] font-black text-[#0055a5] uppercase tracking-wide">Select Your ERP Plan</h2>
                   </div>
-                  <div className="flex justify-between text-[12px] font-bold text-gray-800">
-                    <span>7 Days Remaining</span>
-                    <span className="text-[#cc0000] underline cursor-pointer">Activate Now</span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x border-gray-300">
+                    
+                    {/* ESSENTIAL PLAN */}
+                    <div className="p-6 flex flex-col hover:bg-gray-50 transition-colors">
+                      <div className="mb-4">
+                        <h3 className="text-[18px] font-black text-slate-800 uppercase">Essential</h3>
+                        <div className="mt-2 flex items-baseline gap-1">
+                          <span className="text-[16px] font-bold text-slate-500">₹</span>
+                          <span className="text-[32px] font-black text-[#0055a5] leading-none">799</span>
+                          <span className="text-[12px] font-bold text-slate-500">/mo</span>
+                        </div>
+                        <p className="text-[12px] font-bold text-emerald-600 mt-2 bg-emerald-50 inline-block px-2 py-1 border border-emerald-200 rounded-sm">Up to 100 Students</p>
+                      </div>
+                      <ul className="text-[12px] font-semibold text-slate-600 space-y-3 flex-1 mb-6">
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Student Records Management</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Global Attendance Tracking</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Core Fee Management</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Course & Batch Master</li>
+                      </ul>
+                      <button 
+                        onClick={() => initiateCheckout("Essential Plan", 799)}
+                        className="w-full py-2.5 border-2 border-[#0055a5] text-[#0055a5] font-bold text-[13px] hover:bg-[#0055a5] hover:text-white transition-colors rounded-sm shadow-sm"
+                      >
+                        Select Essential
+                      </button>
+                    </div>
+
+                    {/* STARTER PLAN (POPULAR) */}
+                    <div className="p-6 flex flex-col bg-blue-50/30 relative">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-[#0055a5]"></div>
+                      <div className="absolute top-4 right-4 bg-[#0055a5] text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm shadow-sm">
+                        Most Popular
+                      </div>
+                      <div className="mb-4">
+                        <h3 className="text-[18px] font-black text-slate-800 uppercase">Starter</h3>
+                        <div className="mt-2 flex items-baseline gap-1">
+                          <span className="text-[16px] font-bold text-slate-500">₹</span>
+                          <span className="text-[32px] font-black text-[#0055a5] leading-none">1,499</span>
+                          <span className="text-[12px] font-bold text-slate-500">/mo</span>
+                        </div>
+                        <p className="text-[12px] font-bold text-emerald-600 mt-2 bg-emerald-50 inline-block px-2 py-1 border border-emerald-200 rounded-sm">Up to 500 Students</p>
+                      </div>
+                      <ul className="text-[12px] font-semibold text-slate-600 space-y-3 flex-1 mb-6">
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#0055a5] shrink-0" /> <span className="font-bold text-slate-800">All Essential Features</span></li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> DPP & Study Material Hub</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Online Test Engine</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Analytics & Custom Reports</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> System Alerts & Notifications</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Manual WhatsApp Messaging</li>
+                      </ul>
+                      <button 
+                        onClick={() => initiateCheckout("Starter Plan", 1499)}
+                        className="w-full py-2.5 bg-[#0055a5] border-2 border-[#0055a5] text-white font-bold text-[13px] hover:bg-[#004080] shadow-sm transition-colors rounded-sm"
+                      >
+                        Select Starter
+                      </button>
+                    </div>
+
+                    {/* ENTERPRISE PLAN */}
+                    <div className="p-6 flex flex-col hover:bg-gray-50 transition-colors">
+                      <div className="mb-4">
+                        <h3 className="text-[18px] font-black text-slate-800 uppercase">Enterprise</h3>
+                        <div className="mt-2 flex items-baseline gap-1">
+                          <span className="text-[16px] font-bold text-slate-500">₹</span>
+                          <span className="text-[32px] font-black text-[#0055a5] leading-none">2,499</span>
+                          <span className="text-[12px] font-bold text-slate-500">/mo</span>
+                        </div>
+                        <p className="text-[12px] font-bold text-purple-600 mt-2 bg-purple-50 inline-block px-2 py-1 border border-purple-200 rounded-sm">Unlimited Students</p>
+                      </div>
+                      <ul className="text-[12px] font-semibold text-slate-600 space-y-3 flex-1 mb-6">
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#0055a5] shrink-0" /> <span className="font-bold text-slate-800">All Starter Features</span></li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> SEO Marketing Website</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Advanced Student CRM</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Automatic Fee Reminders</li>
+                        <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Dedicated Account Manager</li>
+                      </ul>
+                      <button 
+                        onClick={() => initiateCheckout("Enterprise Plan", 2499)}
+                        className="w-full py-2.5 border-2 border-[#0055a5] text-[#0055a5] font-bold text-[13px] hover:bg-[#0055a5] hover:text-white transition-colors rounded-sm shadow-sm"
+                      >
+                        Select Enterprise
+                      </button>
+                    </div>
+
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="border border-gray-400 bg-white shadow-sm flex flex-col md:flex-row items-center justify-between">
-                <div className="p-4 flex items-center gap-4">
-                  <div className="h-12 w-12 bg-[#e8f5e9] border border-[#a5d6a7] rounded-full flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-6 h-6 text-[#2e7d32]" />
-                  </div>
-                  <div>
-                    <h3 className="text-[15px] font-bold text-gray-900 uppercase tracking-wide">Active Plan: PRO MODULE</h3>
-                    <div className="text-[12px] font-semibold text-gray-600 mt-0.5 flex gap-4">
-                      <span>Valid Till: <span className="text-black">15 Sep 2026</span></span>
-                      <span>License Key: <span className="font-mono text-[#0055a5]">CW-PRO-9982X</span></span>
+              /* ======================================================== */
+              /* IRCTC-STYLE PAYMENT GATEWAY CHECKOUT                     */
+              /* ======================================================== */
+              <div className="animate-in slide-in-from-right-4 duration-300">
+                <button 
+                  onClick={() => setIsCheckout(false)} 
+                  className="mb-4 flex items-center gap-1 text-[12px] font-bold text-[#0055a5] hover:underline"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Plans
+                </button>
+
+                <div className="border border-gray-300 bg-white shadow-sm rounded-sm">
+                  <div className="p-4 border-b border-gray-300 bg-gray-50 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-[16px] font-bold text-black font-serif">Payment Methods</h2>
+                      <p className="text-[12px] text-gray-500 mt-0.5">Complete payment for {selectedPlanName}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Amount to Pay</div>
+                      <div className="text-[20px] font-black text-[#e65100]">₹{selectedPlanPrice.toLocaleString('en-IN')}</div>
                     </div>
                   </div>
-                </div>
-                <div className="p-4 bg-[#f5f5f5] border-l border-gray-300 md:min-w-[250px] flex flex-col justify-center shrink-0">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase">Usage Quota (Students)</span>
-                  <div className="w-full bg-gray-300 h-2 mt-1 mb-1 border border-gray-400">
-                    <div className="bg-[#0055a5] h-full" style={{ width: '45%' }}></div>
-                  </div>
-                  <div className="flex justify-between text-[12px] font-bold text-gray-800">
-                    <span>225 Active</span>
-                    <span>500 Limit</span>
+
+                  <div className="flex flex-col md:flex-row min-h-[450px]">
+                    
+                    {/* LEFT MENU (IRCTC Style vertical tabs) */}
+                    <div className="w-full md:w-[260px] bg-[#f5f5f5] border-r border-gray-300 flex flex-col py-2">
+                      {[
+                        { id: "cards", label: "IRCTC iPay (Credit Card/Debit Card/UPI)", icon: CardIcon },
+                        { id: "multiple", label: "Multiple Payment Service", icon: Zap },
+                        { id: "netbanking", label: "Netbanking", icon: Building2 },
+                        { id: "pg", label: "Payment Gateway / Credit Card / Debit Card", icon: CardIcon },
+                        { id: "wallets", label: "Wallets / Cash Card", icon: Wallet },
+                        { id: "emi", label: "EMI", icon: Clock }
+                      ].map((method) => (
+                        <button
+                          key={method.id}
+                          onClick={() => setPaymentMethod(method.id)}
+                          className={`px-4 py-3.5 text-left text-[12px] border-y border-transparent flex items-center gap-3 transition-colors ${
+                            paymentMethod === method.id 
+                              ? "bg-[#e2e2e2] border-l-4 border-l-[#ff7722] text-black font-bold border-y-gray-300/50" 
+                              : "text-gray-700 hover:bg-[#e8e8e8] border-l-4 border-l-transparent font-medium"
+                          }`}
+                        >
+                          <method.icon className={`w-4 h-4 ${paymentMethod === method.id ? 'text-[#ff7722]' : 'text-gray-500'}`} />
+                          <span className="leading-tight">{method.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* RIGHT PANEL (Gateways) */}
+                    <div className="flex-1 bg-white p-4 flex flex-col">
+                      <div className="flex-1 space-y-3">
+                        {paymentMethod === "multiple" ? (
+                          <>
+                            <GatewayCard 
+                              id="payu" 
+                              title="Credit & Debit cards /Net Banking/Wallets/UPI/ International Cards" 
+                              provider="Powered by PayU" 
+                              logoText="PayU" 
+                              logoColor="bg-green-500"
+                              selected={selectedGateway === "payu"} 
+                              onClick={() => setSelectedGateway("payu")} 
+                            />
+                            <GatewayCard 
+                              id="razorpay" 
+                              title="Credit & Debit cards / Net Banking / UPI" 
+                              provider="Powered by Razorpay" 
+                              logoText="Razorpay" 
+                              logoColor="bg-blue-600"
+                              selected={selectedGateway === "razorpay"} 
+                              onClick={() => setSelectedGateway("razorpay")} 
+                            />
+                            <GatewayCard 
+                              id="phonepe" 
+                              title="Credit & Debit cards / Wallet / UPI" 
+                              provider="Powered by PhonePe" 
+                              logoText="PhonePe" 
+                              logoColor="bg-purple-600"
+                              selected={selectedGateway === "phonepe"} 
+                              onClick={() => setSelectedGateway("phonepe")} 
+                            />
+                            <GatewayCard 
+                              id="amazon" 
+                              title="Amazon Pay Wallet" 
+                              provider="" 
+                              logoText="pay" 
+                              logoColor="bg-slate-800"
+                              selected={selectedGateway === "amazon"} 
+                              onClick={() => setSelectedGateway("amazon")} 
+                            />
+                            <GatewayCard 
+                              id="plural" 
+                              title="International/Domestic Credit/Debit Cards" 
+                              provider="Powered by Plural" 
+                              logoText="plural" 
+                              logoColor="bg-fuchsia-700"
+                              selected={selectedGateway === "plural"} 
+                              onClick={() => setSelectedGateway("plural")} 
+                            />
+                          </>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                            <ShieldCheck className="w-12 h-12 text-gray-300 mb-3" />
+                            <h4 className="text-gray-600 font-bold text-[13px]">Please select "Multiple Payment Service"</h4>
+                            <p className="text-[12px] text-gray-400 mt-1 max-w-xs">For the highest success rate and UPI options, use the Multiple Payment Service tab.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* BOTTOM ACTION BAR (IRCTC Style Orange Button) */}
+                      <div className="mt-6 pt-4 flex justify-center gap-3">
+                        <button 
+                          onClick={() => setIsCheckout(false)}
+                          className="px-10 py-2 border border-gray-300 bg-gray-100 text-black text-[14px] font-bold hover:bg-gray-200 transition-colors rounded-sm"
+                        >
+                          Back
+                        </button>
+                        <button 
+                          onClick={() => alert(`Initiating secure payment of ₹${selectedPlanPrice} via ${selectedGateway.toUpperCase()}`)}
+                          className="px-12 py-2 bg-[#ff7722] hover:bg-[#e66a1f] text-white text-[14px] font-bold shadow-sm transition-colors rounded-sm border border-[#d9621a]"
+                        >
+                          Pay & Book
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               </div>
             )}
-
-            {/* BILLING MATRIX & ADD-ONS */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              
-              {/* LEFT: Plan Comparison Matrix */}
-              <div className="xl:col-span-2 border border-gray-400 bg-white shadow-sm overflow-hidden flex flex-col">
-                <div className="bg-[#f5f5f5] border-b border-gray-400 px-4 py-2 flex justify-between items-center">
-                  <h2 className="text-[13px] font-bold text-[#0055a5] uppercase">Subscription Matrix</h2>
-                </div>
-                <table className="w-full text-left border-collapse text-[12px]">
-                  <thead className="bg-gradient-to-b from-[#00a3cc] via-[#007a99] to-[#005c73] text-white font-bold">
-                    <tr>
-                      <th className="py-2 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">Features / Modules</th>
-                      <th className="py-2 px-3 border-r border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-center w-[130px]">Pro Plan</th>
-                      <th className="py-2 px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] text-center w-[140px]">Enterprise</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white text-gray-800">
-                    {[
-                      { feat: "Student Capacity", pro: "500 Limit", ent: "Unlimited" },
-                      { feat: "Cloud Storage (Materials)", pro: "10 GB", ent: "100 GB" },
-                      { feat: "WhatsApp Cloud API", pro: "Add-on Available", ent: "Yes (Included)" },
-                      { feat: "White-Label Parent App", pro: "No", ent: "Yes (Android/iOS)" },
-                      { feat: "Multi-Branch Support", pro: "Single Branch", ent: "Up to 5 Branches" },
-                    ].map((row, i) => (
-                      <tr key={i} className="border-b border-gray-300 hover:bg-[#eef5fa]">
-                        <td className="py-2.5 px-3 border-r border-gray-300 font-semibold">{row.feat}</td>
-                        <td className="py-2.5 px-3 border-r border-gray-300 text-center text-[#0055a5] font-bold">{row.pro}</td>
-                        <td className="py-2.5 px-3 text-center text-[#008000] font-bold">{row.ent}</td>
-                      </tr>
-                    ))}
-                    <tr className="bg-[#f9f9f9]">
-                      <td className="py-3 px-3 border-r border-gray-300 text-right font-bold uppercase text-gray-600">Pricing (Annual)</td>
-                      <td className="py-3 px-3 border-r border-gray-300 text-center font-bold text-[15px]">₹14,999</td>
-                      <td className="py-3 px-3 text-center font-bold text-[15px] text-[#008000]">₹34,999</td>
-                    </tr>
-                    <tr>
-                      <td className="border-r border-gray-300"></td>
-                      <td className="p-2 border-r border-gray-300 text-center bg-[#f5f5f5]">
-                        <button className="w-full bg-[#0055a5] text-white py-1.5 text-[11px] font-bold border border-[#004080] hover:bg-[#004080] flex items-center justify-center gap-1 shadow-sm transition-colors">
-                          <CheckCircle2 className="w-3 h-3" /> Select Pro
-                        </button>
-                      </td>
-                      <td className="p-2 text-center bg-[#f5f5f5]">
-                        <button className="w-full bg-white text-gray-800 py-1.5 text-[11px] font-bold border border-gray-400 hover:bg-gray-100 flex items-center justify-center gap-1 shadow-sm transition-colors">
-                          <Zap className="w-3 h-3" /> Select Enterprise
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* RIGHT: Add-ons & UPI Payment Panel */}
-              <div className="flex flex-col gap-6">
-                
-                {/* Add-ons Checklist */}
-                <div className="border border-gray-400 bg-white shadow-sm">
-                  <div className="bg-[#f5f5f5] border-b border-gray-400 px-4 py-2">
-                    <h2 className="text-[13px] font-bold text-gray-800 uppercase">A-La-Carte Add-Ons</h2>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <label className="flex items-center gap-3 p-2 border border-gray-300 bg-[#f9f9f9] hover:bg-[#eef5fa] cursor-pointer transition-colors">
-                      <input type="checkbox" className="w-4 h-4 text-[#0055a5] border-gray-400 focus:ring-0" />
-                      <div className="flex-1">
-                        <div className="text-[12px] font-bold text-gray-900">WhatsApp API</div>
-                        <div className="text-[11px] text-gray-500">Automated SMS</div>
-                      </div>
-                      <div className="text-[12px] font-bold text-[#008000]">+₹2,500/yr</div>
-                    </label>
-                    <label className="flex items-center gap-3 p-2 border border-[#a5d6a7] bg-[#e8f5e9] cursor-not-allowed">
-                      <input type="checkbox" defaultChecked disabled className="w-4 h-4 text-[#008000] border-gray-400 focus:ring-0" />
-                      <div className="flex-1">
-                        <div className="text-[12px] font-bold text-gray-900">Online CBT Module</div>
-                        <div className="text-[11px] text-[#2e7d32]">Default Active</div>
-                      </div>
-                      <div className="text-[12px] font-bold text-gray-500">Included</div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Secure UPI / Checkout Panel */}
-                <div className="border border-[#0055a5] bg-[#eef5fa] shadow-sm overflow-hidden">
-                  <div className="bg-[#0055a5] px-4 py-2 text-white flex justify-between items-center">
-                    <h2 className="text-[13px] font-bold uppercase flex items-center gap-1.5"><CreditCard className="w-4 h-4" /> Quick Pay Ledger</h2>
-                    <span className="text-[11px] font-bold bg-white/20 px-2 py-0.5 border border-white/40">100% SECURE</span>
-                  </div>
-                  <div className="p-4 text-center border-b border-gray-300">
-                    <div className="flex justify-between text-[12px] font-bold text-gray-600 mb-1">
-                      <span>Pro Plan (Base)</span>
-                      <span>₹{selectedPlanPrice.toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between text-[12px] font-bold text-gray-600 mb-3 border-b border-gray-300 pb-2">
-                      <span>Add-ons</span>
-                      <span>₹{addonPrice.toLocaleString('en-IN')}</span>
-                    </div>
-                    
-                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mt-3 mb-0.5">Total Amount Payable</div>
-                    <div className="text-[28px] font-black text-[#0055a5] leading-none mb-4">₹{(selectedPlanPrice + addonPrice).toLocaleString('en-IN')}</div>
-                    
-                    <button className="w-full bg-[#008000] hover:bg-[#006600] border border-[#004d00] text-white py-2.5 text-[13px] font-bold flex items-center justify-center gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition-colors mb-3">
-                      <Smartphone className="w-4 h-4" /> Pay via UPI / Card
-                    </button>
-                    
-                    <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500 font-bold uppercase">
-                      <span>GPay</span> • <span>PhonePe</span> • <span>Paytm</span> • <span>Visa</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* INVOICE LEDGER (Empty for free trial users, but headers present for completeness) */}
-            <div className="border border-gray-400 bg-white shadow-sm mt-6">
-              <div className="bg-[#f5f5f5] border-b border-gray-400 px-4 py-2 flex justify-between items-center">
-                <h2 className="text-[13px] font-bold text-gray-800 uppercase">Billing Ledger & Invoices</h2>
-              </div>
-              <table className="w-full text-left text-[12px] border-collapse">
-                <thead className="bg-[#e8e8e8] text-gray-700 font-bold border-b border-gray-300">
-                  <tr>
-                    <th className="py-2 px-4 border-r border-gray-300">Invoice No.</th>
-                    <th className="py-2 px-4 border-r border-gray-300">Date</th>
-                    <th className="py-2 px-4 border-r border-gray-300">Description</th>
-                    <th className="py-2 px-4 border-r border-gray-300 text-right">Amount</th>
-                    <th className="py-2 px-4 border-r border-gray-300 text-center">Status</th>
-                    <th className="py-2 px-4 text-center">Receipt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!isFreeTrial ? (
-                    <tr className="border-b border-gray-300 hover:bg-[#f9f9f9]">
-                      <td className="py-2 px-4 border-r border-gray-300 font-mono text-[#0055a5]">INV-26-0042</td>
-                      <td className="py-2 px-4 border-r border-gray-300 text-gray-600">15 Aug 2026</td>
-                      <td className="py-2 px-4 border-r border-gray-300 font-semibold">Pro Plan Annual Renewal</td>
-                      <td className="py-2 px-4 border-r border-gray-300 text-right font-bold">₹14,999</td>
-                      <td className="py-2 px-4 border-r border-gray-300 text-center"><span className="bg-[#e8f5e9] text-[#2e7d32] px-2 py-0.5 border border-[#a5d6a7] font-bold text-[10px] uppercase">Paid</span></td>
-                      <td className="py-2 px-4 text-center">
-                        <button className="text-[#0055a5] hover:underline font-bold flex items-center justify-center gap-1 mx-auto">
-                          <Download className="w-3.5 h-3.5" /> PDF
-                        </button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="py-6 text-center text-gray-500 font-bold">
-                        No invoices generated yet. Your 7-Day Free Trial is currently active.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-          </div>
-        )}
-
-        {/* Fallback for other tabs */}
-        {activeTab !== "General" && activeTab !== "SaaS Billing" && (
-          <div className="p-8 text-center text-[13px] text-gray-500 font-bold border border-gray-300 bg-[#fafafa]">
-            Module configuration pending for {activeTab}.
           </div>
         )}
 
@@ -333,7 +396,7 @@ export default function SettingsPage() {
 }
 
 // ------------------------------------------------------------------
-// REUSABLE FIELD COMPONENT
+// REUSABLE COMPONENTS
 // ------------------------------------------------------------------
 function Field({ 
   label, 
@@ -356,20 +419,20 @@ function Field({
 }) {
   return (
     <div className="flex items-start mb-2.5">
-      <label className="w-[160px] shrink-0 text-right pr-2.5 text-[12px] text-black pt-1 leading-tight">
-        {required && <span className="text-[#cc0000] font-bold">*</span>}{label} :
+      <label className="w-[160px] shrink-0 text-right pr-3 text-[12px] text-gray-700 font-bold pt-1.5 leading-tight">
+        {required && <span className="text-[#cc0000] font-black">*</span>} {label}
       </label>
       <div className="flex-1">
         {isTextArea ? (
           <textarea 
             defaultValue={defaultValue} 
             disabled={disabled}
-            className="w-full border border-[#cccccc] p-1.5 text-[12px] text-gray-800 focus:border-[#0055a5] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] h-16 resize-none disabled:bg-[#f0f0f0] disabled:text-gray-500 transition-colors" 
+            className="w-full border border-gray-300 p-2 text-[12px] text-gray-900 focus:border-[#0055a5] focus:ring-1 focus:ring-[#0055a5] outline-none h-16 resize-none disabled:bg-gray-100 disabled:text-gray-500 transition-colors rounded-sm shadow-inner" 
           />
         ) : isSelect ? (
           <select 
             disabled={disabled}
-            className="w-full border border-[#cccccc] p-1 text-[12px] text-gray-800 focus:border-[#0055a5] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] h-[26px] disabled:bg-[#f0f0f0] disabled:text-gray-500 transition-colors cursor-pointer"
+            className="w-full border border-gray-300 p-1.5 text-[12px] text-gray-900 focus:border-[#0055a5] focus:ring-1 focus:ring-[#0055a5] outline-none h-[30px] disabled:bg-gray-100 disabled:text-gray-500 transition-colors cursor-pointer rounded-sm shadow-inner"
           >
             {options.map(opt => (
               <option key={opt} value={opt}>{opt}</option>
@@ -380,9 +443,37 @@ function Field({
             type={type} 
             defaultValue={defaultValue} 
             disabled={disabled}
-            className="w-full border border-[#cccccc] p-1 text-[12px] text-gray-800 focus:border-[#0055a5] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] h-[26px] disabled:bg-[#f0f0f0] disabled:text-gray-500 transition-colors" 
+            className="w-full border border-gray-300 p-1.5 text-[12px] text-gray-900 focus:border-[#0055a5] focus:ring-1 focus:ring-[#0055a5] outline-none h-[30px] disabled:bg-gray-100 disabled:text-gray-500 transition-colors rounded-sm shadow-inner" 
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+function GatewayCard({ 
+  title, provider, logoText, logoColor, selected, onClick 
+}: { 
+  id: string, title: string, provider: string, logoText: string, logoColor: string, selected: boolean, onClick: () => void 
+}) {
+  return (
+    <div 
+      onClick={onClick}
+      className={`p-3 border rounded-sm cursor-pointer transition-all flex items-center gap-4 ${
+        selected ? "border-[#0055a5] shadow-[0_0_0_1px_#0055a5]" : "border-gray-300 hover:border-gray-400"
+      }`}
+    >
+      <div className={`w-10 h-10 ${logoColor} rounded-full flex items-center justify-center text-white text-[10px] font-black italic tracking-tighter shrink-0`}>
+        {logoText}
+      </div>
+      <div className="flex-1 flex flex-wrap items-center gap-1">
+        <span className="text-[13px] font-bold text-black">{title}</span>
+        {provider && <span className="text-[12px] font-medium text-gray-600">{provider}</span>}
+      </div>
+      <div className="w-5 h-5 flex shrink-0">
+        <div className={`w-full h-full rounded-full border-2 flex items-center justify-center ${selected ? 'border-[#0055a5]' : 'border-gray-300'}`}>
+          {selected && <div className="w-2.5 h-2.5 bg-[#0055a5] rounded-full"></div>}
+        </div>
       </div>
     </div>
   );
