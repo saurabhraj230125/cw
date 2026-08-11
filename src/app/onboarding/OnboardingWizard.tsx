@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Building2, ArrowRight, Loader2, Sparkles, 
   Server, CheckCircle2, AlertTriangle, ShieldCheck, 
-  Database, Lock, LayoutDashboard, FileText
+  Database, Lock, LayoutDashboard, FileText,
+  MapPin, Users, Target, BookOpen, Wallet, CalendarClock
 } from "lucide-react";
-import { completeOnboardingAction } from "../../app/actions/owner-auth";
+import { completeOnboardingAction } from "../actions/owner-auth";
 
 // Define the steps for our dynamic left-hand guide
 const WIZARD_STEPS = [
@@ -26,12 +27,24 @@ const WIZARD_STEPS = [
   },
   {
     id: 2,
-    title: "Name Your Workspace.",
-    subtitle: "This will be the official name on all student receipts and parent apps.",
+    title: "The Basics.",
+    subtitle: "Tell us who you are and where you are located.",
     icon: Building2
   },
   {
     id: 3,
+    title: "Institute Scale.",
+    subtitle: "Help us configure your server capacity based on your operations.",
+    icon: Users
+  },
+  {
+    id: 4,
+    title: "Primary Goal.",
+    subtitle: "What is the biggest challenge you want CoachingWala to solve today?",
+    icon: Target
+  },
+  {
+    id: 5,
     title: "Provisioning Servers...",
     subtitle: "Please don't close this window while we allocate your database.",
     icon: Server
@@ -45,24 +58,27 @@ export default function OnboardingWizard() {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   
-  // Form State
+  // Form Data State
   const [agreedPrivacy, setAgreedPrivacy] = useState(false);
   const [instituteName, setInstituteName] = useState("");
+  const [location, setLocation] = useState("");
+  const [category, setCategory] = useState("");
+  const [studentCount, setStudentCount] = useState("");
+  const [mainProblem, setMainProblem] = useState("");
   
   // Provisioning State
   const [provisionStep, setProvisionStep] = useState(0);
 
-  // Handle the final submission
-  const handleSetup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle the final submission (Triggered at Step 4)
+  const handleSetup = async () => {
     const cleanName = instituteName.trim();
     if (!cleanName) return;
     
     setError(null);
-    setStep(3); // Move to provisioning screen
+    setStep(5); // Move to final provisioning screen
 
     try {
-      // 1. Trigger backend DB creation
+      // 1. Trigger backend DB creation (You can update this action later to accept the new data)
       await completeOnboardingAction(cleanName);
       
       // 2. Cinematic Loading Sequence
@@ -77,7 +93,7 @@ export default function OnboardingWizard() {
 
     } catch (err: any) {
       setError(err.message || "Failed to provision workspace.");
-      setStep(2); // Kick back to input if failed
+      setStep(4); // Kick back if failed
       setProvisionStep(0);
     }
   };
@@ -98,7 +114,7 @@ export default function OnboardingWizard() {
           
           {/* Step Indicator */}
           <div className="flex gap-2 mb-12">
-            {[0, 1, 2, 3].map((i) => (
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === step ? 'w-12 bg-white' : i < step ? 'w-6 bg-white/50' : 'w-6 bg-white/20'}`} />
             ))}
           </div>
@@ -116,7 +132,7 @@ export default function OnboardingWizard() {
                 <div className="bg-white/20 p-2 rounded-lg">
                   <currentGuide.icon className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-sm font-bold tracking-widest uppercase opacity-90">Step {step + 1} of 4</h1>
+                <h1 className="text-sm font-bold tracking-widest uppercase opacity-90">Step {step + 1} of 6</h1>
               </div>
               
               <h2 className="text-5xl font-extrabold leading-[1.1] mb-6 drop-shadow-sm tracking-tight">
@@ -127,21 +143,13 @@ export default function OnboardingWizard() {
               </p>
             </motion.div>
           </AnimatePresence>
-
-          {/* Placeholder for future images/illustrations you mentioned */}
-          <div className="mt-8 bg-white/5 border border-white/10 rounded-2xl h-64 w-full flex items-center justify-center backdrop-blur-md shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#003B73]/50 to-transparent z-10"></div>
-            <LayoutDashboard className="w-24 h-24 text-white/20" />
-            <span className="absolute bottom-4 left-4 text-xs font-bold text-white/50 uppercase tracking-widest z-20">Illustration Space</span>
-          </div>
-
         </div>
       </div>
 
       {/* ========================================================= */}
       {/* RIGHT SIDE: Interactive Wizard Area */}
       {/* ========================================================= */}
-      <div className="w-full lg:w-[55%] flex flex-col justify-center px-8 sm:px-16 py-12 relative overflow-y-auto">
+      <div className="w-full lg:w-[55%] flex flex-col justify-center px-8 sm:px-12 py-12 relative overflow-y-auto">
         <div className="max-w-md w-full mx-auto relative">
           
           {error && (
@@ -161,7 +169,7 @@ export default function OnboardingWizard() {
                 </div>
                 <h3 className="text-3xl font-bold text-slate-900 tracking-tight">Let's set up your ERP.</h3>
                 <p className="text-slate-500 font-medium leading-relaxed">
-                  We are about to configure your dedicated database, set up your admin profile, and unlock your 7-day unrestricted trial. Have your institute details ready.
+                  We are about to configure your dedicated database, set up your admin profile, and unlock your 7-day unrestricted trial.
                 </p>
                 <button onClick={() => setStep(1)} className="w-full bg-[#0055a5] hover:bg-[#004080] text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-[#0055a5]/30 hover:shadow-[#0055a5]/40 mt-8 flex items-center justify-center gap-2 active:scale-[0.98]">
                   Begin Setup <ArrowRight className="w-5 h-5" />
@@ -179,7 +187,6 @@ export default function OnboardingWizard() {
                 <p className="text-slate-500 font-medium leading-relaxed mb-6">
                   Before we create your database, please confirm you understand our data handling policies for educational institutions.
                 </p>
-                
                 <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
                   <label className="flex items-start gap-3 cursor-pointer group">
                     <input type="checkbox" checked={agreedPrivacy} onChange={(e) => setAgreedPrivacy(e.target.checked)} className="mt-1 w-5 h-5 text-[#0055a5] rounded border-gray-300 focus:ring-[#0055a5] cursor-pointer" />
@@ -188,7 +195,6 @@ export default function OnboardingWizard() {
                     </span>
                   </label>
                 </div>
-
                 <div className="flex gap-4 mt-8">
                   <button onClick={() => setStep(0)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
                   <button onClick={() => setStep(2)} disabled={!agreedPrivacy} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
@@ -198,7 +204,7 @@ export default function OnboardingWizard() {
               </motion.div>
             )}
 
-            {/* STEP 2: INSTITUTE INPUT */}
+            {/* STEP 2: INSTITUTE NAME & LOCATION */}
             {step === 2 && (
               <motion.div key="step-2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div className="w-16 h-16 bg-[#e6f2ff] rounded-2xl flex items-center justify-center mb-6 border border-[#0055a5]/20 shadow-inner">
@@ -206,32 +212,103 @@ export default function OnboardingWizard() {
                 </div>
                 <h3 className="text-3xl font-bold text-slate-900 tracking-tight">Institute Details</h3>
                 
-                <form onSubmit={handleSetup} className="space-y-6 mt-6">
+                <div className="space-y-5 mt-6">
                   <div className="space-y-2">
                     <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">Official Institute Name</label>
-                    <input 
-                      type="text" 
-                      value={instituteName}
-                      onChange={(e) => setInstituteName(e.target.value)}
-                      required
-                      placeholder="e.g. Apex Academy" 
-                      className="w-full px-5 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-lg text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm"
-                    />
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input type="text" value={instituteName} onChange={(e) => setInstituteName(e.target.value)} placeholder="e.g. Apex Academy" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
+                    </div>
                   </div>
-
+                  <div className="space-y-2">
+                    <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">City / Location</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Kota, Rajasthan" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
+                    </div>
+                  </div>
                   <div className="flex gap-4 mt-8">
-                    <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
-                    <button type="submit" disabled={!instituteName.trim()} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
-                      Launch Dashboard <Sparkles className="w-5 h-5" />
+                    <button onClick={() => setStep(1)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
+                    <button onClick={() => setStep(3)} disabled={!instituteName.trim() || !location.trim()} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
+                      Next Step <ArrowRight className="w-5 h-5" />
                     </button>
                   </div>
-                </form>
+                </div>
               </motion.div>
             )}
 
-            {/* STEP 3: PROVISIONING */}
+            {/* STEP 3: CATEGORY & SIZE */}
             {step === 3 && (
-              <motion.div key="step-3" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="py-10 flex flex-col items-center">
+              <motion.div key="step-3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                <h3 className="text-3xl font-bold text-slate-900 tracking-tight mb-6">Operations Setup</h3>
+                
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">What do you teach?</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {["JEE / NEET", "School Academics", "UPSC / Govt Exams", "Skill & IT Training"].map((cat) => (
+                        <button key={cat} onClick={() => setCategory(cat)} className={`p-4 rounded-xl border text-sm font-bold text-left transition-all ${category === cat ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-300 text-slate-700 hover:border-[#0055a5]/50'}`}>
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">Total Active Students</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {["< 50", "50-200", "200-500", "500+"].map((count) => (
+                        <button key={count} onClick={() => setStudentCount(count)} className={`p-3 rounded-xl border text-sm font-bold text-center transition-all ${studentCount === count ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-300 text-slate-700 hover:border-[#0055a5]/50'}`}>
+                          {count}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 mt-8">
+                    <button onClick={() => setStep(2)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
+                    <button onClick={() => setStep(4)} disabled={!category || !studentCount} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
+                      Next Step <ArrowRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 4: BIGGEST PROBLEM */}
+            {step === 4 && (
+              <motion.div key="step-4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                <h3 className="text-3xl font-bold text-slate-900 tracking-tight mb-6">Final Step</h3>
+                
+                <div className="space-y-4">
+                  <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">What is your biggest operational challenge right now?</label>
+                  
+                  <div className="flex flex-col gap-3">
+                    {[
+                      { id: "fees", label: "Fee Collection & Missing Dues", icon: Wallet },
+                      { id: "attendance", label: "Tracking Attendance & Alerts", icon: CalendarClock },
+                      { id: "exams", label: "Managing Tests & Results", icon: BookOpen },
+                      { id: "all", label: "Everything is a mess right now", icon: AlertTriangle }
+                    ].map((prob) => (
+                      <button key={prob.id} onClick={() => setMainProblem(prob.id)} className={`p-4 rounded-xl border text-sm font-bold flex items-center gap-3 transition-all ${mainProblem === prob.id ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-300 text-slate-700 hover:border-[#0055a5]/50'}`}>
+                        <prob.icon className="w-5 h-5" /> {prob.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-4 mt-8">
+                    <button onClick={() => setStep(3)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
+                    <button onClick={handleSetup} disabled={!mainProblem} className="w-2/3 bg-[#008000] hover:bg-[#006600] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
+                      Launch Dashboard <Sparkles className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 5: PROVISIONING */}
+            {step === 5 && (
+              <motion.div key="step-5" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="py-10 flex flex-col items-center">
                 <div className="relative mb-8">
                   <motion.div animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.8, 0.4] }} transition={{ repeat: Infinity, duration: 2 }} className="absolute inset-0 bg-[#0055a5] blur-xl rounded-full"></motion.div>
                   <div className="bg-white p-5 rounded-2xl relative z-10 shadow-lg border border-gray-100">
@@ -247,7 +324,7 @@ export default function OnboardingWizard() {
                     { label: "Initializing secure environment...", icon: ShieldCheck },
                     { label: "Configuring relational databases...", icon: Database },
                     { label: "Establishing SSL & API endpoints...", icon: Lock },
-                    { label: "Finalizing dashboard permissions...", icon: LayoutDashboard }
+                    { label: `Optimizing dashboard for ${studentCount} students...`, icon: LayoutDashboard }
                   ].map((s, idx) => {
                     const isCompleted = idx < provisionStep;
                     const isCurrent = idx === provisionStep;
