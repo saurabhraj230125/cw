@@ -117,3 +117,33 @@ export async function logoutAction() {
   await supabase.auth.signOut();
   return { success: true };
 }
+// ==========================================
+// 5. UPGRADE SAAS SUBSCRIPTION
+// ==========================================
+export async function upgradeSaaSPlanAction(planName: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Authentication lost.");
+
+  // 1. Find which institute this user owns
+  const { data: membership } = await supabase
+    .from("core_memberships")
+    .select("institute_id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!membership) throw new Error("Institute not found.");
+
+  // 2. Update the database to 'active' paid status
+  const { error } = await supabase
+    .from("institutes")
+    .update({ 
+      subscription_status: 'active',
+      subscription_plan: planName 
+    })
+    .eq("id", membership.institute_id);
+
+  if (error) throw new Error(error.message);
+  
+  return { success: true };
+}
