@@ -22,7 +22,7 @@ export default async function SettingsPage() {
     .select(`
       institute_id,
       role_key,
-      institutes ( name, slug, created_at, subscription_status, subscription_plan ),
+      institutes ( id, name, slug, created_at, subscription_status, subscription_plan ),
       branches ( name, city )
     `)
     .eq("user_id", user.id)
@@ -48,12 +48,12 @@ export default async function SettingsPage() {
   const isTrialExpired = !isPaid && (now > expiresAt);
   const daysLeft = (isPaid || isTrialExpired) ? 0 : Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-  // 2. 🚨 CRITICAL FIX: Fetch any ACTIVE pending payments from the database
+  // 2. 🚨 CRITICAL FIX: Look for "invoice_requested" instead of "pending"
   const { data: pendingPayment } = await supabase
     .from("core_payments")
     .select("*")
     .eq("institute_id", membership.institute_id)
-    .eq("status", "pending")
+    .in("status", ["pending", "invoice_requested"]) // catches both just in case
     .maybeSingle();
 
   return (
@@ -66,7 +66,7 @@ export default async function SettingsPage() {
       daysLeft={daysLeft}
       isPaid={isPaid}
       currentPlan={currentPlan}
-      activePendingPayment={pendingPayment || null} // Pass it to the client
+      activePendingPayment={pendingPayment || null} 
     />
   );
 }

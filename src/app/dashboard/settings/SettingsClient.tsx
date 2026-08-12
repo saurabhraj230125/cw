@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { 
-  Save, RefreshCw, 
-  CheckCircle2, ShieldCheck,
-  Clock, AlertTriangle, ChevronRight, Check,
-  Building2, Smartphone, ArrowLeft, QrCode, Copy,
-  Loader2, Sparkles, Lock
+  Save, RefreshCw, CheckCircle2, ShieldCheck, Clock, AlertTriangle, 
+  ChevronRight, Check, Building2, ArrowLeft, Loader2, FileText, Send
 } from "lucide-react";
-import { submitUtrPaymentAction } from "../../actions/billing";
+
+// The server action we created to handle the Zoho Invoice Request
+import { requestInvoiceAction } from "../../actions/billing";
 
 export default function SettingsClient({
   userEmail = "admin@institute.com",
@@ -31,6 +31,7 @@ export default function SettingsClient({
   currentPlan?: string;
   activePendingPayment?: any;
 }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("SaaS Billing");
   const [isSaving, setIsSaving] = useState(false);
   
@@ -38,40 +39,26 @@ export default function SettingsClient({
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
   const [selectedPlanId, setSelectedPlanId] = useState<string>("starter");
   
-  // Checkout & Payment State
+  // Checkout & Submission State
   const [isCheckout, setIsCheckout] = useState(false);
-  const [utrNumber, setUtrNumber] = useState("");
-  const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const upiId = "7080626215@ybl";
 
   const handleSave = () => {
     setIsSaving(true);
     setTimeout(() => setIsSaving(false), 1200);
   };
 
-  const handleCopyUpi = () => {
-    navigator.clipboard.writeText(upiId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleUtrSubmit = async () => {
-    if (utrNumber.length < 12) {
-      alert("Please enter a valid 12-digit UTR number.");
-      return;
-    }
-    
+  const handleInvoiceRequest = async () => {
     setIsSubmitting(true);
     try {
-      await submitUtrPaymentAction(selectedPlanId as any, billingCycle, utrNumber);
+      await requestInvoiceAction(selectedPlanId as any, billingCycle);
       setIsCheckout(false);
       setIsSubmitting(false);
+      // Hard refresh to fetch the new "Invoice Requested" state from the server
       window.location.reload(); 
     } catch (error: any) {
       setIsSubmitting(false);
-      alert(`Submission Error: ${error.message}`);
+      alert(`Request Error: ${error.message}`);
     }
   };
 
@@ -159,7 +146,7 @@ export default function SettingsClient({
       <div className="flex-1 p-6 md:p-10 bg-[#f8fafc] overflow-auto pb-36">
         
         {activeTab === "General" && (
-          <div className="max-w-[1200px] border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden mx-auto">
+          <div className="max-w-[1200px] border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden mx-auto animate-in fade-in duration-200">
             <div className="p-8 space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-2">
                 <div>
@@ -177,10 +164,31 @@ export default function SettingsClient({
                   <Field label="Current Session" isSelect options={["2026-27", "2025-26"]} />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8 border-t border-gray-100">
+                <div>
+                  <h3 className="text-sm text-[#0055a5] font-bold mb-5 uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#0055a5]"></div> Branch Address
+                  </h3>
+                  <Field label="Address" required isTextArea defaultValue="" />
+                  <Field label="City" required isSelect options={[city.toUpperCase(), "RANCHI", "DHANBAD"]} />
+                  <Field label="State" required isSelect options={["JHARKHAND", "BIHAR", "UTTAR PRADESH"]} />
+                  <Field label="Pin Code" required defaultValue="" />
+                </div>
+                <div>
+                  <h3 className="text-sm text-[#0055a5] font-bold mb-5 uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#0055a5]"></div> Head Office
+                  </h3>
+                  <Field label="Address" required isTextArea defaultValue="" />
+                  <Field label="City" required isSelect options={[city.toUpperCase(), "LUCKNOW", "VARANASI"]} />
+                  <Field label="State" required isSelect options={["UTTAR PRADESH", "DELHI", "BIHAR"]} />
+                  <Field label="Pin Code" required defaultValue="" />
+                </div>
+              </div>
             </div>
             <div className="bg-slate-50 border-t border-gray-200 px-8 py-5 flex justify-end gap-4">
-              <button onClick={handleSave} disabled={isSaving} className="bg-[#0055a5] border border-[#004080] text-white px-8 py-2.5 text-[13px] font-bold hover:bg-[#004080] shadow-sm rounded-lg">
-                {isSaving ? "Updating..." : <><Save className="w-4 h-4 inline mr-2" /> Save Changes</>}
+              <button onClick={handleSave} disabled={isSaving} className="bg-[#0055a5] border border-[#004080] text-white px-8 py-2.5 text-[13px] font-bold hover:bg-[#004080] shadow-sm rounded-lg flex items-center transition-colors disabled:opacity-70">
+                {isSaving ? "Updating..." : <><Save className="w-4 h-4 mr-2" /> Save Changes</>}
               </button>
             </div>
           </div>
@@ -189,22 +197,27 @@ export default function SettingsClient({
         {activeTab === "SaaS Billing" && (
           <div className="max-w-[1100px] animate-in fade-in duration-200 mx-auto">
             
-            {/* PENDING STATE */}
+            {/* INVOICE REQUESTED STATE */}
             {activePendingPayment ? (
-              <div className="bg-white border border-blue-200 shadow-xl shadow-blue-900/5 rounded-3xl p-12 text-center max-w-2xl mx-auto mt-10">
+              <div className="bg-white border border-blue-200 shadow-xl shadow-blue-900/5 rounded-3xl p-12 text-center max-w-2xl mx-auto mt-10 animate-in zoom-in-95 duration-500">
                 <div className="w-24 h-24 bg-blue-50 border-4 border-blue-100 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-                  <Clock className="w-10 h-10 text-[#0055a5] animate-pulse" />
+                  <FileText className="w-10 h-10 text-[#0055a5]" />
                 </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Payment Verification in Progress</h2>
-                <p className="text-lg font-medium text-slate-500 mb-10 leading-relaxed">
-                  We received your UTR reference <span className="font-mono font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded shadow-sm">{activePendingPayment.utr}</span> for the <span className="font-bold text-[#0055a5] uppercase">{activePendingPayment.plan_id}</span> plan. Our team is verifying the funds.
+                <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Invoice Requested</h2>
+                <p className="text-lg font-medium text-slate-500 mb-8 leading-relaxed">
+                  We are generating a formal GST-compliant invoice for the <span className="font-bold text-[#0055a5] uppercase">{activePendingPayment.plan_id}</span> plan. It will be sent to <span className="font-bold text-slate-800">{userEmail}</span> shortly.
                 </p>
-                <div className="bg-blue-50 text-[#0055a5] text-sm font-bold px-6 py-4 rounded-xl border border-blue-200 flex items-center justify-center gap-3 w-max mx-auto shadow-sm">
-                  <Loader2 className="w-5 h-5 animate-spin" /> Usually verified within 15-30 minutes.
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 mb-6 text-left max-w-md mx-auto shadow-sm">
+                  <p className="mb-3 flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-blue-100 text-[#0055a5] flex items-center justify-center text-xs shrink-0 mt-0.5">1</div> Check your email/WhatsApp for the invoice document.</p>
+                  <p className="mb-3 flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-blue-100 text-[#0055a5] flex items-center justify-center text-xs shrink-0 mt-0.5">2</div> Transfer the exact amount via NEFT, IMPS, or UPI.</p>
+                  <p className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-blue-100 text-[#0055a5] flex items-center justify-center text-xs shrink-0 mt-0.5">3</div> Your workspace will activate automatically upon payment confirmation.</p>
                 </div>
               </div>
             ) : !isCheckout ? (
               
+              /* ======================================================== */
+              /* PRICING MATRIX FLOW                                      */
+              /* ======================================================== */
               <div className="space-y-10">
                 
                 {/* SUBSCRIPTION BANNER */}
@@ -313,7 +326,7 @@ export default function SettingsClient({
                 </div>
 
                 {/* STICKY CHECKOUT BAR */}
-                <div className="fixed bottom-0 left-0 md:left-[250px] right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4 z-40 shadow-lg">
+                <div className="fixed bottom-0 left-0 md:left-[250px] right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100">
                       <ShieldCheck className="w-6 h-6 text-[#0055a5]" />
@@ -332,7 +345,7 @@ export default function SettingsClient({
                       onClick={() => setIsCheckout(true)}
                       className="flex-1 md:flex-none px-10 py-3.5 bg-[#e65100] hover:bg-[#cc4800] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2"
                     >
-                      Proceed to UPI Checkout <ChevronRight className="w-4 h-4" />
+                      Proceed to Request <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -341,7 +354,7 @@ export default function SettingsClient({
             ) : (
               
               /* ======================================================== */
-              /* CLEAN UPI & UTR CHECKOUT FLOW                            */
+              /* PROFESSIONAL INVOICE CHECKOUT FLOW                       */
               /* ======================================================== */
               <div className="max-w-4xl mx-auto animate-in slide-in-from-right-4 duration-300 mb-10">
                 <button onClick={() => setIsCheckout(false)} className="mb-6 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-[#0055a5] transition-colors">
@@ -349,74 +362,61 @@ export default function SettingsClient({
                 </button>
 
                 <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-                  <div className="bg-slate-900 p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4 text-white">
+                  <div className="bg-[#0f172a] p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4 text-white">
                     <div>
                       <h2 className="text-2xl font-black text-white">{activePlan.name} Subscription</h2>
                       <p className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" /> Billed {billingCycle} • Secure Manual UTR Verification
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" /> Billed {billingCycle} • Corporate Invoicing
                       </p>
                     </div>
                     <div className="text-right bg-white/10 px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-md">
-                      <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-1">Amount Due</div>
+                      <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-1">Total Payable</div>
                       <div className="text-3xl font-black text-emerald-400 leading-none">₹{finalTotal.toLocaleString('en-IN')}</div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col md:flex-row">
-                    <div className="w-full md:w-[340px] bg-slate-50 border-r border-slate-200 p-8 flex flex-col">
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-6">Payment Guidelines</h3>
-                      <div className="space-y-6 relative flex-1">
-                        <div className="absolute left-[15px] top-4 bottom-4 w-[2px] bg-slate-200"></div>
-                        <div className="flex gap-4 relative z-10"><div className="w-8 h-8 bg-white border-2 border-slate-300 rounded-full flex items-center justify-center shrink-0 shadow-sm"><Smartphone className="w-3 h-3 text-slate-500" /></div><div className="pt-1.5"><h4 className="text-xs font-bold text-slate-800">1. Open any UPI app</h4></div></div>
-                        <div className="flex gap-4 relative z-10"><div className="w-8 h-8 bg-blue-50 border-2 border-[#0055a5] rounded-full flex items-center justify-center shrink-0 shadow-sm"><QrCode className="w-3 h-3 text-[#0055a5]" /></div><div className="pt-1.5"><h4 className="text-xs font-bold text-[#0055a5]">2. Scan QR or copy ID</h4></div></div>
-                        <div className="flex gap-4 relative z-10"><div className="w-8 h-8 bg-white border-2 border-slate-300 rounded-full flex items-center justify-center shrink-0 shadow-sm"><Building2 className="w-3 h-3 text-slate-500" /></div><div className="pt-1.5"><h4 className="text-xs font-bold text-slate-800">3. Submit 12-digit UTR</h4></div></div>
+                  <div className="p-8 md:p-12 flex flex-col items-center text-center max-w-2xl mx-auto">
+                    <div className="w-16 h-16 bg-blue-50 text-[#0055a5] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-blue-100">
+                      <Building2 className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-900 mb-4">Request Official Invoice</h3>
+                    <p className="text-sm font-semibold text-slate-500 mb-10 leading-relaxed">
+                      To ensure GST compliance and maintain accurate bookkeeping for your institute, we process all subscriptions via formal invoicing. Click below to request your invoice for the <span className="font-bold text-slate-800">{activePlan.name} Plan</span>.
+                    </p>
+
+                    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-10 text-left">
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Next Steps</h4>
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-[#0055a5] text-white flex items-center justify-center text-xs font-bold shrink-0">1</div>
+                          <p className="text-sm font-semibold text-slate-700 mt-0.5">An official invoice will be sent to <span className="font-bold text-slate-900">{userEmail}</span>.</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold shrink-0">2</div>
+                          <p className="text-sm font-semibold text-slate-700 mt-0.5">You can execute the transfer via NEFT, IMPS, RTGS, or UPI using the bank details listed on the document.</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold shrink-0">3</div>
+                          <p className="text-sm font-semibold text-slate-700 mt-0.5">Your premium dashboard will activate automatically upon payment confirmation.</p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex-1 bg-white p-8 md:p-10 flex flex-col justify-center items-center">
-                      <div className="w-full max-w-sm mx-auto flex flex-col items-center">
-                        <div className="bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-300 w-full flex flex-col items-center shadow-sm relative mb-6">
-                          <div className="bg-white p-3 rounded-2xl shadow-md border border-slate-200 mb-4 w-[180px] h-[180px] flex items-center justify-center">
-                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=${upiId}&pn=CoachingWala&am=${finalTotal}&cu=INR`} alt="UPI QR Code" className="w-full h-full object-contain" />
-                          </div>
-                          <div onClick={handleCopyUpi} className="flex items-center justify-between w-full bg-white px-4 py-3 border border-slate-200 rounded-xl cursor-pointer hover:border-[#0055a5] transition-colors shadow-sm">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              <Smartphone className="w-4 h-4 text-slate-400 shrink-0" />
-                              <span className="text-xs font-bold text-slate-700 font-mono truncate">{upiId}</span>
-                            </div>
-                            {copied ? <Check className="w-4 h-4 text-emerald-500 shrink-0" /> : <Copy className="w-4 h-4 text-slate-400 shrink-0" />}
-                          </div>
-                        </div>
-                        
-                        <div className="w-full bg-[#f8fafc] p-6 rounded-2xl border border-slate-200 shadow-sm">
-                          <label className="block text-[11px] font-black text-slate-600 uppercase tracking-widest mb-3 text-center">Enter 12-digit UTR Reference</label>
-                          <input 
-                            type="text" 
-                            value={utrNumber} 
-                            onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, ''))} 
-                            placeholder="312345678901" 
-                            maxLength={12} 
-                            className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3.5 text-base font-black text-slate-900 outline-none focus:border-[#0055a5] focus:ring-2 shadow-sm text-center tracking-[0.2em] mb-4" 
-                          />
-                          <button 
-                            onClick={handleUtrSubmit} 
-                            disabled={utrNumber.length !== 12 || isSubmitting} 
-                            className={`w-full py-4 rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2 ${
-                              utrNumber.length === 12 ? 'bg-[#0055a5] text-white hover:bg-[#004080]' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                            }`}
-                          >
-                            {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Transmitting...</> : <>Submit UTR for Verification <ChevronRight className="w-4 h-4" /></>}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    <button 
+                      onClick={handleInvoiceRequest} 
+                      disabled={isSubmitting} 
+                      className={`w-full py-4 rounded-xl text-sm font-black uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2 ${
+                        isSubmitting ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-[#0055a5] text-white hover:bg-[#004080] hover:shadow-lg hover:-translate-y-0.5'
+                      }`}
+                    >
+                      {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Request...</> : <>Request GST Invoice <Send className="w-4 h-4" /></>}
+                    </button>
                   </div>
                 </div>
               </div>
             )}
           </div>
         )}
-
       </div>
     </main>
   );
@@ -429,7 +429,15 @@ function Field({ label, required = false, defaultValue = "", type = "text", disa
         {required && <span className="text-red-500 font-black mr-1">*</span>}{label}
       </label>
       <div className="flex-1">
-        {isTextArea ? <textarea defaultValue={defaultValue} disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none h-20 resize-none disabled:bg-slate-50 shadow-sm" /> : isSelect ? <select disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none cursor-pointer disabled:bg-slate-50 shadow-sm appearance-none">{options.map((opt:any) => <option key={opt}>{opt}</option>)}</select> : <input type={type} defaultValue={defaultValue} disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none disabled:bg-slate-50 shadow-sm" />}
+        {isTextArea ? (
+          <textarea defaultValue={defaultValue} disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none h-20 resize-none disabled:bg-slate-50 shadow-sm" />
+        ) : isSelect ? (
+          <select disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none cursor-pointer disabled:bg-slate-50 shadow-sm appearance-none">
+            {options.map((opt:any) => <option key={opt}>{opt}</option>)}
+          </select>
+        ) : (
+          <input type={type} defaultValue={defaultValue} disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none disabled:bg-slate-50 shadow-sm" />
+        )}
       </div>
     </div>
   );
