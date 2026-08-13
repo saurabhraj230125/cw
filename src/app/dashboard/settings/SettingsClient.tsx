@@ -1,443 +1,544 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { 
-  Save, RefreshCw, CheckCircle2, ShieldCheck, Clock, AlertTriangle, 
-  ChevronRight, Check, Building2, ArrowLeft, Loader2, FileText, Send
+import {
+  Building2, CreditCard, Shield, Save, Upload,
+  CheckCircle2, Zap, DownloadCloud, Eye, EyeOff,
+  Smartphone, Monitor, Globe, LogOut, ChevronRight,
+  AlertTriangle, RefreshCw, Star, ArrowUpRight,
+  Lock, Mail, Phone, MapPin, Hash, Clock
 } from "lucide-react";
 
-// The server action we created to handle the Zoho Invoice Request
-import { requestInvoiceAction } from "../../actions/billing";
+// ─── Types ────────────────────────────────────────────────────────────────────
+type Props = {
+  userEmail: string;
+  instituteName: string;
+  instituteSlug: string;
+  city: string;
+  isTrialExpired: boolean;
+  daysLeft: number;
+  isPaid: boolean;
+  currentPlan: string;
+};
 
-export default function SettingsClient({
-  userEmail = "admin@institute.com",
-  instituteName = "My Institute",
-  instituteSlug = "my-institute",
-  city = "Bokaro",
-  isTrialExpired = false,
-  daysLeft = 7,
-  isPaid = false,
-  currentPlan = "Free Trial",
-  activePendingPayment = null 
-}: {
-  userEmail?: string;
-  instituteName?: string;
-  instituteSlug?: string;
-  city?: string;
-  isTrialExpired?: boolean;
-  daysLeft?: number;
-  isPaid?: boolean;
-  currentPlan?: string;
-  activePendingPayment?: any;
-}) {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState("SaaS Billing");
-  const [isSaving, setIsSaving] = useState(false);
-  
-  // Clean Plan State (No add-ons)
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("starter");
-  
-  // Checkout & Submission State
-  const [isCheckout, setIsCheckout] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+type Tab = "general" | "billing" | "security";
+
+// ─── Shared Primitives ────────────────────────────────────────────────────────
+const inputCls =
+  "w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-800 bg-white " +
+  "focus:border-[#0055a5] focus:ring-2 focus:ring-[#0055a5]/10 outline-none transition-all placeholder:text-slate-400";
+
+const labelCls = "block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5";
+
+const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`bg-white border border-slate-200 rounded-2xl overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
+const CardHeader = ({ title, subtitle, icon: Icon }: { title: string; subtitle?: string; icon?: any }) => (
+  <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+    {Icon && (
+      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4 text-[#0055a5]" />
+      </div>
+    )}
+    <div>
+      <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide">{title}</h3>
+      {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+    </div>
+  </div>
+);
+
+// ─── General Tab ──────────────────────────────────────────────────────────────
+function GeneralTab({ instituteName, userEmail, city }: Pick<Props, "instituteName" | "userEmail" | "city">) {
+  const [dragOver, setDragOver] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => setIsSaving(false), 1200);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   };
-
-  const handleInvoiceRequest = async () => {
-    setIsSubmitting(true);
-    try {
-      await requestInvoiceAction(selectedPlanId as any, billingCycle);
-      setIsCheckout(false);
-      setIsSubmitting(false);
-      // Hard refresh to fetch the new "Invoice Requested" state from the server
-      window.location.reload(); 
-    } catch (error: any) {
-      setIsSubmitting(false);
-      alert(`Request Error: ${error.message}`);
-    }
-  };
-
-  const plans = [
-    {
-      id: "essential",
-      name: "Essential",
-      priceMonthly: 799,
-      priceYearly: 7999,
-      capacity: "Up to 100 Students",
-      desc: "Core administrative tools for individual tutors and emerging batch centers.",
-      features: [
-        "Student Records & Directory",
-        "Global Attendance Tracking",
-        "Core Fee Ledger Management",
-        "Course & Batch Master Setup"
-      ]
-    },
-    {
-      id: "starter",
-      name: "Starter",
-      priceMonthly: 1499,
-      priceYearly: 14999,
-      capacity: "Up to 500 Students",
-      desc: "Our most popular module for established coaching institutes seeking total automation.",
-      features: [
-        "All Essential Features Included",
-        "DPP & Study Material Hub",
-        "Online Test & Quiz Engine",
-        "Advanced Analytics & Reports",
-        "Automated System Alerts",
-        "Manual Broadcast Messaging"
-      ],
-      popular: true
-    },
-    {
-      id: "pro",
-      name: "Enterprise",
-      priceMonthly: 2499,
-      priceYearly: 24999,
-      capacity: "Unlimited Students",
-      desc: "Full white-glove infrastructure for large institutions and multi-branch networks.",
-      features: [
-        "All Starter Features Included",
-        "Dedicated SEO Marketing Website",
-        "Advanced Student CRM & Pipeline",
-        "Automated WhatsApp Fee Reminders",
-        "Priority 24/7 Account Manager"
-      ]
-    }
-  ];
-
-  const activePlan = plans.find(p => p.id === selectedPlanId) || plans[1];
-  const finalTotal = billingCycle === "yearly" ? activePlan.priceYearly : activePlan.priceMonthly;
 
   return (
-    <main className="min-h-screen bg-[#f3f4f6] font-sans flex flex-col relative">
-      
-      {/* 1. TOP HEADER */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-white shrink-0 flex justify-between items-center shadow-sm z-20 relative">
-        <h2 className="text-lg text-slate-800 font-bold">Institute Master Settings</h2>
-        <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
-          ID: {instituteSlug.toUpperCase()}
-        </span>
-      </div>
-
-      {/* 2. TAB ROW */}
-      <div className="px-6 pt-4 bg-white border-b border-gray-200 flex gap-2 shrink-0 overflow-x-auto hide-scrollbar z-10 relative">
-        {["General", "Branding & White-Label", "Integrations", "SaaS Billing"].map((tab) => (
-          <button 
-            key={tab}
-            onClick={() => { setActiveTab(tab); setIsCheckout(false); }}
-            className={`px-6 py-2.5 text-[13px] font-bold rounded-t-xl transition-all whitespace-nowrap ${
-              activeTab === tab 
-                ? "bg-[#f8fafc] border-t border-l border-r border-gray-200 text-[#0055a5] -mb-[1px] shadow-[0_4px_0_#f8fafc]" 
-                : "bg-transparent border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* 3. WORKSPACE */}
-      <div className="flex-1 p-6 md:p-10 bg-[#f8fafc] overflow-auto pb-36">
-        
-        {activeTab === "General" && (
-          <div className="max-w-[1200px] border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden mx-auto animate-in fade-in duration-200">
-            <div className="p-8 space-y-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-2">
-                <div>
-                  <Field label="Institute Reg No" required defaultValue={instituteSlug.toUpperCase()} disabled />
-                  <Field label="Institute Name" required defaultValue={instituteName} />
-                  <Field label="System Domain" required defaultValue={`${instituteSlug}.coachingwala.com`} disabled />
-                  <Field label="Establishment Year" defaultValue="2026" />
-                  <Field label="Institute Type" isSelect options={["Coaching Center", "School", "Tutor"]} />
+    <div className="space-y-5">
+      {/* Institute Identity */}
+      <Card>
+        <CardHeader title="Institute Identity" subtitle="Your public-facing brand information" icon={Building2} />
+        <div className="p-6 space-y-5">
+          {/* Logo Upload */}
+          <div>
+            <label className={labelCls}>Institute Logo</label>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); }}
+              className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${
+                dragOver
+                  ? "border-[#0055a5] bg-blue-50"
+                  : "border-slate-200 hover:border-[#0055a5]/50 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-xl bg-[#003366] flex items-center justify-center text-white font-black text-xl shadow-md">
+                  {instituteName.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <Field label="Director/Owner Name" required defaultValue="Admin User" />
-                  <Field label="Support Email Id" required defaultValue={userEmail} disabled type="email" />
-                  <Field label="Support Mobile No" required defaultValue="+91" />
-                  <Field label="Alternate Phone" defaultValue="" />
-                  <Field label="Current Session" isSelect options={["2026-27", "2025-26"]} />
+                  <p className="text-sm font-bold text-slate-700 mt-2">
+                    <span className="text-[#0055a5]">Click to upload</span> or drag & drop
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">PNG, JPG, SVG up to 2MB. Recommended: 400×400px</p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8 border-t border-gray-100">
-                <div>
-                  <h3 className="text-sm text-[#0055a5] font-bold mb-5 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#0055a5]"></div> Branch Address
-                  </h3>
-                  <Field label="Address" required isTextArea defaultValue="" />
-                  <Field label="City" required isSelect options={[city.toUpperCase(), "RANCHI", "DHANBAD"]} />
-                  <Field label="State" required isSelect options={["JHARKHAND", "BIHAR", "UTTAR PRADESH"]} />
-                  <Field label="Pin Code" required defaultValue="" />
-                </div>
-                <div>
-                  <h3 className="text-sm text-[#0055a5] font-bold mb-5 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#0055a5]"></div> Head Office
-                  </h3>
-                  <Field label="Address" required isTextArea defaultValue="" />
-                  <Field label="City" required isSelect options={[city.toUpperCase(), "LUCKNOW", "VARANASI"]} />
-                  <Field label="State" required isSelect options={["UTTAR PRADESH", "DELHI", "BIHAR"]} />
-                  <Field label="Pin Code" required defaultValue="" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-slate-50 border-t border-gray-200 px-8 py-5 flex justify-end gap-4">
-              <button onClick={handleSave} disabled={isSaving} className="bg-[#0055a5] border border-[#004080] text-white px-8 py-2.5 text-[13px] font-bold hover:bg-[#004080] shadow-sm rounded-lg flex items-center transition-colors disabled:opacity-70">
-                {isSaving ? "Updating..." : <><Save className="w-4 h-4 mr-2" /> Save Changes</>}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "SaaS Billing" && (
-          <div className="max-w-[1100px] animate-in fade-in duration-200 mx-auto">
-            
-            {/* INVOICE REQUESTED STATE */}
-            {activePendingPayment ? (
-              <div className="bg-white border border-blue-200 shadow-xl shadow-blue-900/5 rounded-3xl p-12 text-center max-w-2xl mx-auto mt-10 animate-in zoom-in-95 duration-500">
-                <div className="w-24 h-24 bg-blue-50 border-4 border-blue-100 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-                  <FileText className="w-10 h-10 text-[#0055a5]" />
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Invoice Requested</h2>
-                <p className="text-lg font-medium text-slate-500 mb-8 leading-relaxed">
-                  We are generating a formal GST-compliant invoice for the <span className="font-bold text-[#0055a5] uppercase">{activePendingPayment.plan_id}</span> plan. It will be sent to <span className="font-bold text-slate-800">{userEmail}</span> shortly.
-                </p>
-                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 mb-6 text-left max-w-md mx-auto shadow-sm">
-                  <p className="mb-3 flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-blue-100 text-[#0055a5] flex items-center justify-center text-xs shrink-0 mt-0.5">1</div> Check your email/WhatsApp for the invoice document.</p>
-                  <p className="mb-3 flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-blue-100 text-[#0055a5] flex items-center justify-center text-xs shrink-0 mt-0.5">2</div> Transfer the exact amount via NEFT, IMPS, or UPI.</p>
-                  <p className="flex items-start gap-2"><div className="w-5 h-5 rounded-full bg-blue-100 text-[#0055a5] flex items-center justify-center text-xs shrink-0 mt-0.5">3</div> Your workspace will activate automatically upon payment confirmation.</p>
-                </div>
-              </div>
-            ) : !isCheckout ? (
-              
-              /* ======================================================== */
-              /* PRICING MATRIX FLOW                                      */
-              /* ======================================================== */
-              <div className="space-y-10">
-                
-                {/* SUBSCRIPTION BANNER */}
-                {isPaid ? (
-                  <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100 border border-emerald-300 shadow-sm flex flex-col md:flex-row items-center justify-between rounded-2xl p-6 md:p-8">
-                    <div className="flex items-center gap-5">
-                      <div className="h-14 w-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center shadow-md"><ShieldCheck className="w-8 h-8" /></div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">Active Subscription</span>
-                          <h3 className="text-xl font-black text-slate-900 uppercase">{currentPlan}</h3>
-                        </div>
-                        <p className="text-sm font-semibold text-slate-600 mt-1">Your workspace is fully verified. All institutional modules are unlocked.</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={`border shadow-sm flex flex-col md:flex-row items-center justify-between rounded-2xl overflow-hidden p-6 md:p-8 ${isTrialExpired ? 'bg-red-50 border-red-200' : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'}`}>
-                    <div className="flex items-start gap-5">
-                      <div className={`h-14 w-14 border rounded-2xl flex items-center justify-center ${isTrialExpired ? 'bg-red-100 border-red-300 text-red-600' : 'bg-amber-100 border-amber-300 text-amber-600'}`}>
-                        <Clock className="w-7 h-7" />
-                      </div>
-                      <div>
-                        <h3 className={`text-lg font-black uppercase ${isTrialExpired ? 'text-red-700' : 'text-slate-900'}`}>{isTrialExpired ? 'Trial Expired - Workspace Locked' : '7-Day Free Trial Active'}</h3>
-                        <p className={`text-sm font-semibold mt-1 ${isTrialExpired ? 'text-red-600' : 'text-amber-800'}`}>
-                          {isTrialExpired ? 'Please select a plan below to restore administrative access.' : `${daysLeft} days remaining before trial lock.`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* BILLING CYCLE SWITCHER */}
-                <div className="flex flex-col items-center">
-                  <div className="bg-white border border-slate-200 p-1.5 rounded-full flex items-center shadow-sm relative">
-                    <div className={`absolute top-1.5 bottom-1.5 w-[50%] bg-[#0055a5] rounded-full shadow-md transition-all duration-300 ease-out ${billingCycle === 'monthly' ? 'left-1.5' : 'left-[calc(50%-6px)]'}`}></div>
-                    <button onClick={() => setBillingCycle("monthly")} className={`relative z-10 w-36 py-2.5 text-sm font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-slate-500'}`}>Monthly Billing</button>
-                    <button onClick={() => setBillingCycle("yearly")} className={`relative z-10 w-36 py-2.5 text-sm font-bold flex justify-center gap-1.5 ${billingCycle === 'yearly' ? 'text-white' : 'text-slate-500'}`}>
-                      Yearly <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${billingCycle === 'yearly' ? 'bg-white text-[#0055a5]' : 'bg-emerald-500 text-white'}`}>Save 20%</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* BEAUTIFUL UNIFIED PRICING GRID (NO SHRINKING) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {plans.map((plan) => {
-                    const isSelected = selectedPlanId === plan.id;
-                    const price = billingCycle === "yearly" ? plan.priceYearly : plan.priceMonthly;
-
-                    return (
-                      <div 
-                        key={plan.id}
-                        onClick={() => setSelectedPlanId(plan.id)}
-                        className={`bg-white rounded-3xl border-2 transition-all cursor-pointer flex flex-col p-8 relative shadow-sm hover:shadow-md ${
-                          isSelected ? 'border-[#0055a5] ring-4 ring-blue-500/10 bg-gradient-to-b from-blue-50/20 to-white' : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        {plan.popular && (
-                          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#0055a5] text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-md">
-                            Most Popular Choice
-                          </div>
-                        )}
-
-                        <div className="mb-6">
-                          <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{plan.name}</h3>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-[#0055a5] bg-[#0055a5]' : 'border-slate-300'}`}>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                            </div>
-                          </div>
-                          <p className="text-xs font-semibold text-slate-500 min-h-[32px]">{plan.desc}</p>
-                        </div>
-
-                        <div className="mb-6 pb-6 border-b border-slate-100">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-bold text-slate-400">₹</span>
-                            <span className="text-4xl font-black text-slate-900 tracking-tight">{price.toLocaleString('en-IN')}</span>
-                            <span className="text-xs font-bold text-slate-400">/{billingCycle === 'yearly' ? 'year' : 'month'}</span>
-                          </div>
-                          <div className="mt-3 inline-block bg-slate-100 text-slate-700 text-[11px] font-bold px-3 py-1 rounded-md">{plan.capacity}</div>
-                        </div>
-
-                        <div className="space-y-4 flex-1 mb-8">
-                          <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider">What's included</div>
-                          <ul className="space-y-3">
-                            {plan.features.map((feat, i) => (
-                              <li key={i} className="flex items-start gap-2.5 text-xs font-bold text-slate-700">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                                <span>{feat}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setSelectedPlanId(plan.id); setIsCheckout(true); }}
-                          className={`w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all ${
-                            isSelected ? 'bg-[#0055a5] text-white hover:bg-[#004080] shadow-blue-900/10' : 'bg-slate-900 text-white hover:bg-slate-800'
-                          }`}
-                        >
-                          Select {plan.name} Plan
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* STICKY CHECKOUT BAR */}
-                <div className="fixed bottom-0 left-0 md:left-[250px] right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 md:p-6 flex flex-col md:flex-row justify-between items-center gap-4 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100">
-                      <ShieldCheck className="w-6 h-6 text-[#0055a5]" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-black text-slate-900">{activePlan.name} Plan <span className="text-slate-400 font-medium text-xs">({billingCycle})</span></h3>
-                      <p className="text-xs font-bold text-emerald-600">Selected capacity: {activePlan.capacity}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6 w-full md:w-auto">
-                    <div className="text-right hidden sm:block">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Payable</div>
-                      <div className="text-2xl font-black text-[#0055a5] leading-none">₹{finalTotal.toLocaleString('en-IN')}</div>
-                    </div>
-                    <button 
-                      onClick={() => setIsCheckout(true)}
-                      className="flex-1 md:flex-none px-10 py-3.5 bg-[#e65100] hover:bg-[#cc4800] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2"
-                    >
-                      Proceed to Request <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            ) : (
-              
-              /* ======================================================== */
-              /* PROFESSIONAL INVOICE CHECKOUT FLOW                       */
-              /* ======================================================== */
-              <div className="max-w-4xl mx-auto animate-in slide-in-from-right-4 duration-300 mb-10">
-                <button onClick={() => setIsCheckout(false)} className="mb-6 flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-[#0055a5] transition-colors">
-                  <ArrowLeft className="w-4 h-4" /> Back to Plan Selection
+                <button className="mt-1 flex items-center gap-1.5 text-xs font-bold text-[#0055a5] bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                  <Upload className="w-3.5 h-3.5" /> Upload Logo
                 </button>
-
-                <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-                  <div className="bg-[#0f172a] p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-4 text-white">
-                    <div>
-                      <h2 className="text-2xl font-black text-white">{activePlan.name} Subscription</h2>
-                      <p className="text-xs font-medium text-slate-400 mt-1 flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" /> Billed {billingCycle} • Corporate Invoicing
-                      </p>
-                    </div>
-                    <div className="text-right bg-white/10 px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-md">
-                      <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-1">Total Payable</div>
-                      <div className="text-3xl font-black text-emerald-400 leading-none">₹{finalTotal.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-
-                  <div className="p-8 md:p-12 flex flex-col items-center text-center max-w-2xl mx-auto">
-                    <div className="w-16 h-16 bg-blue-50 text-[#0055a5] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-blue-100">
-                      <Building2 className="w-8 h-8" />
-                    </div>
-                    <h3 className="text-2xl font-black text-slate-900 mb-4">Request Official Invoice</h3>
-                    <p className="text-sm font-semibold text-slate-500 mb-10 leading-relaxed">
-                      To ensure GST compliance and maintain accurate bookkeeping for your institute, we process all subscriptions via formal invoicing. Click below to request your invoice for the <span className="font-bold text-slate-800">{activePlan.name} Plan</span>.
-                    </p>
-
-                    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-10 text-left">
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Next Steps</h4>
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-[#0055a5] text-white flex items-center justify-center text-xs font-bold shrink-0">1</div>
-                          <p className="text-sm font-semibold text-slate-700 mt-0.5">An official invoice will be sent to <span className="font-bold text-slate-900">{userEmail}</span>.</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold shrink-0">2</div>
-                          <p className="text-sm font-semibold text-slate-700 mt-0.5">You can execute the transfer via NEFT, IMPS, RTGS, or UPI using the bank details listed on the document.</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold shrink-0">3</div>
-                          <p className="text-sm font-semibold text-slate-700 mt-0.5">Your premium dashboard will activate automatically upon payment confirmation.</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={handleInvoiceRequest} 
-                      disabled={isSubmitting} 
-                      className={`w-full py-4 rounded-xl text-sm font-black uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-2 ${
-                        isSubmitting ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-[#0055a5] text-white hover:bg-[#004080] hover:shadow-lg hover:-translate-y-0.5'
-                      }`}
-                    >
-                      {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Request...</> : <>Request GST Invoice <Send className="w-4 h-4" /></>}
-                    </button>
-                  </div>
-                </div>
               </div>
-            )}
+            </div>
           </div>
-        )}
+
+          {/* Fields Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}><Building2 className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />Institute Name</label>
+              <input type="text" defaultValue={instituteName} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}><Hash className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />Registration Number</label>
+              <input type="text" defaultValue="EDU-REG-2024-00847" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}><Mail className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />Support Email</label>
+              <input type="email" defaultValue={userEmail} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}><Phone className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />Contact Phone</label>
+              <input type="tel" defaultValue="+91 63068 14355" className={inputCls} />
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelCls}><MapPin className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />Full Address</label>
+              <input type="text" defaultValue={`Near Bus Stand, Civil Lines, ${city}, Uttar Pradesh - 273001`} className={inputCls} />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Preferences */}
+      <Card>
+        <CardHeader title="Preferences" subtitle="Regional and display settings" icon={Globe} />
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Default Currency</label>
+              <div className="relative">
+                <select defaultValue="INR" className={inputCls + " appearance-none pr-8"}>
+                  <option value="INR">INR — Indian Rupee (₹)</option>
+                  <option value="USD">USD — US Dollar ($)</option>
+                  <option value="GBP">GBP — British Pound (£)</option>
+                </select>
+                <ChevronRight className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}><Clock className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />Timezone</label>
+              <div className="relative">
+                <select defaultValue="Asia/Kolkata" className={inputCls + " appearance-none pr-8"}>
+                  <option value="Asia/Kolkata">Asia/Kolkata (IST, UTC+5:30)</option>
+                  <option value="UTC">UTC (Coordinated Universal Time)</option>
+                  <option value="America/New_York">America/New_York (EST)</option>
+                </select>
+                <ChevronRight className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Save Bar */}
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={handleSave}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm shadow-sm transition-all ${
+            saved
+              ? "bg-green-500 text-white"
+              : "bg-[#0055a5] hover:bg-[#004080] text-white"
+          }`}
+        >
+          {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {saved ? "Saved!" : "Save Changes"}
+        </button>
       </div>
-    </main>
+    </div>
   );
 }
 
-function Field({ label, required = false, defaultValue = "", type = "text", disabled = false, isTextArea = false, isSelect = false, options = [] }: any) {
+// ─── Billing Tab ──────────────────────────────────────────────────────────────
+const INVOICES = [
+  { id: "INV-2026-08", date: "01 Aug 2026", amount: "₹2,499", status: "Paid" },
+  { id: "INV-2026-07", date: "01 Jul 2026", amount: "₹2,499", status: "Paid" },
+  { id: "INV-2026-06", date: "01 Jun 2026", amount: "₹2,499", status: "Paid" },
+];
+
+function BillingTab({ isPaid, currentPlan, daysLeft, isTrialExpired }: Pick<Props, "isPaid" | "currentPlan" | "daysLeft" | "isTrialExpired">) {
+  const planLabel = isPaid ? (currentPlan || "Pro Plan") : (isTrialExpired ? "Trial Expired" : "Free Trial");
+  const studentsUsed = 342;
+  const studentsMax  = 500;
+  const storageUsed  = 45;
+  const storageMax   = 100;
+
   return (
-    <div className="flex items-start mb-3.5">
-      <label className="w-[160px] shrink-0 text-right pr-4 text-xs text-slate-700 font-bold pt-2.5 uppercase tracking-wider">
-        {required && <span className="text-red-500 font-black mr-1">*</span>}{label}
-      </label>
-      <div className="flex-1">
-        {isTextArea ? (
-          <textarea defaultValue={defaultValue} disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none h-20 resize-none disabled:bg-slate-50 shadow-sm" />
-        ) : isSelect ? (
-          <select disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none cursor-pointer disabled:bg-slate-50 shadow-sm appearance-none">
-            {options.map((opt:any) => <option key={opt}>{opt}</option>)}
-          </select>
-        ) : (
-          <input type={type} defaultValue={defaultValue} disabled={disabled} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 outline-none disabled:bg-slate-50 shadow-sm" />
-        )}
+    <div className="space-y-5">
+      {/* Current Plan */}
+      <Card>
+        <div className="bg-gradient-to-r from-[#003366] via-[#004b87] to-[#0066cc] p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+                <span className="text-xs font-black text-amber-300 uppercase tracking-widest">Pro Plan</span>
+              </div>
+              <p className="text-3xl font-black text-white">₹2,499<span className="text-base font-semibold text-white/60"> / month</span></p>
+              <p className="text-sm text-white/60 mt-1">Billed monthly · Next renewal: 1 Sep 2026</p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              {isPaid ? (
+                <span className="flex items-center gap-1.5 bg-green-500 text-white text-[11px] font-black px-3 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> ACTIVE
+                </span>
+              ) : (
+                <span className={`text-[11px] font-black px-3 py-1 rounded-full ${isTrialExpired ? "bg-red-500 text-white" : "bg-amber-400 text-amber-900"}`}>
+                  {isTrialExpired ? "EXPIRED" : `TRIAL · ${daysLeft}d left`}
+                </span>
+              )}
+              <button className="flex items-center gap-1.5 bg-white text-[#0055a5] text-xs font-black px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors shadow-sm">
+                <Zap className="w-3.5 h-3.5 fill-[#0055a5]" /> Upgrade Plan <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Usage Stats */}
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {[
+            { label: "Active Students", used: studentsUsed, max: studentsMax, unit: "students", color: "bg-[#0055a5]" },
+            { label: "Storage Used",    used: storageUsed,  max: storageMax,  unit: "GB",        color: "bg-purple-500" },
+          ].map(s => (
+            <div key={s.label}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-slate-600">{s.label}</span>
+                <span className="text-xs font-black text-slate-900">{s.used} / {s.max} {s.unit}</span>
+              </div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${s.color} ${(s.used / s.max) > 0.85 ? "animate-pulse" : ""}`}
+                  style={{ width: `${(s.used / s.max) * 100}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{Math.round((s.used / s.max) * 100)}% used</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Payment Method */}
+      <Card>
+        <CardHeader title="Payment Method" subtitle="Saved payment details for auto-renewal" icon={CreditCard} />
+        <div className="p-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-8 bg-slate-800 rounded-md flex items-center justify-center shrink-0">
+              <div className="text-white text-[9px] font-black tracking-wider">VISA</div>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">Visa ending in <span className="font-black text-slate-900">4242</span></p>
+              <p className="text-xs text-slate-500 mt-0.5">Expires 08/2028 · Billing to {">"}admin@futureq.com</p>
+            </div>
+          </div>
+          <button className="text-xs font-bold text-[#0055a5] hover:underline flex items-center gap-1 whitespace-nowrap">
+            <RefreshCw className="w-3.5 h-3.5" /> Update Method
+          </button>
+        </div>
+      </Card>
+
+      {/* Billing History */}
+      <Card>
+        <CardHeader title="Billing History" subtitle="Past invoices and payment records" icon={Clock} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Invoice</th>
+                <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Date</th>
+                <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Amount</th>
+                <th className="text-left px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wide">PDF</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {INVOICES.map(inv => (
+                <tr key={inv.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-6 py-3.5 font-mono text-xs font-bold text-slate-600">{inv.id}</td>
+                  <td className="px-6 py-3.5 text-slate-700 font-medium text-[13px]">{inv.date}</td>
+                  <td className="px-6 py-3.5 font-black text-slate-900 tabular-nums">{inv.amount}</td>
+                  <td className="px-6 py-3.5">
+                    <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> {inv.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3.5 text-right">
+                    <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-[#0055a5] transition-colors" title="Download PDF">
+                      <DownloadCloud className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Security Tab ─────────────────────────────────────────────────────────────
+const SESSIONS = [
+  { device: "Windows 11", browser: "Chrome 126", ip: "192.168.97.161", current: true,  time: "Active now"       },
+  { device: "Android 14", browser: "Chrome Mobile", ip: "103.21.58.4", current: false, time: "2 hours ago"     },
+  { device: "macOS 14",   browser: "Safari 17",   ip: "157.47.92.10", current: false, time: "Yesterday, 9 PM" },
+];
+
+function SecurityTab() {
+  const [showCurrent, setShowCurrent]   = useState(false);
+  const [showNew, setShowNew]           = useState(false);
+  const [showConfirm, setShowConfirm]   = useState(false);
+  const [twoFA, setTwoFA]               = useState(false);
+  const [pwSaved, setPwSaved]           = useState(false);
+
+  const handlePwSave = () => {
+    setPwSaved(true);
+    setTimeout(() => setPwSaved(false), 2500);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Password Management */}
+      <Card>
+        <CardHeader title="Password Management" subtitle="Change your account login password" icon={Lock} />
+        <div className="p-6 space-y-4 max-w-lg">
+          {[
+            { label: "Current Password", show: showCurrent, toggle: () => setShowCurrent(p => !p) },
+            { label: "New Password",     show: showNew,     toggle: () => setShowNew(p => !p)     },
+            { label: "Confirm Password", show: showConfirm, toggle: () => setShowConfirm(p => !p) },
+          ].map(f => (
+            <div key={f.label}>
+              <label className={labelCls}>{f.label}</label>
+              <div className="relative">
+                <input
+                  type={f.show ? "text" : "password"}
+                  placeholder="••••••••••••"
+                  className={inputCls + " pr-10"}
+                />
+                <button
+                  type="button"
+                  onClick={f.toggle}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {f.show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+            <p className="text-[11px] font-semibold text-[#0055a5]">
+              Use 8+ characters with a mix of uppercase, lowercase, numbers, and symbols.
+            </p>
+          </div>
+
+          <button
+            onClick={handlePwSave}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all ${
+              pwSaved ? "bg-green-500 text-white" : "bg-[#0055a5] hover:bg-[#004080] text-white"
+            }`}
+          >
+            {pwSaved ? <CheckCircle2 className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+            {pwSaved ? "Password Updated!" : "Update Password"}
+          </button>
+        </div>
+      </Card>
+
+      {/* Two-Factor Authentication */}
+      <Card>
+        <CardHeader title="Two-Factor Authentication" subtitle="Add an extra layer of security to your account" icon={Smartphone} />
+        <div className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${twoFA ? "bg-green-100" : "bg-slate-100"}`}>
+                <Smartphone className={`w-5 h-5 ${twoFA ? "text-green-600" : "text-slate-400"}`} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Authenticator App (TOTP)</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {twoFA ? "Active — your account is protected with 2FA" : "Not configured — enable to secure your login"}
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <button
+              onClick={() => setTwoFA(p => !p)}
+              className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#0055a5]/30 ${
+                twoFA ? "bg-[#0055a5]" : "bg-slate-200"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                  twoFA ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {twoFA && (
+            <div className="mt-4 bg-green-50 border border-green-100 rounded-xl p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-green-800">2FA is enabled</p>
+                <p className="text-xs text-green-700 mt-0.5">Your account is now protected with time-based one-time passwords via Google Authenticator or Authy.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Active Sessions */}
+      <Card>
+        <CardHeader title="Active Sessions" subtitle="Devices currently signed into your account" icon={Monitor} />
+        <div className="divide-y divide-slate-100">
+          {SESSIONS.map((s, i) => (
+            <div key={i} className="px-6 py-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${s.current ? "bg-green-500 animate-pulse" : "bg-slate-300"}`} />
+                <div>
+                  <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    {s.device} · {s.browser}
+                    {s.current && (
+                      <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Current</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5 font-medium">IP: {s.ip} · {s.time}</p>
+                </div>
+              </div>
+              {!s.current && (
+                <button className="text-xs font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap">
+                  Sign Out
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <button className="flex items-center gap-2 text-sm font-bold text-red-600 hover:text-red-700 transition-colors">
+            <LogOut className="w-4 h-4" />
+            Sign out of all other devices
+          </button>
+        </div>
+      </Card>
+
+      {/* Danger Zone */}
+      <Card>
+        <CardHeader title="Danger Zone" subtitle="Irreversible account actions" icon={AlertTriangle} />
+        <div className="p-6 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold text-slate-800">Delete Institute Account</p>
+            <p className="text-xs text-slate-500 mt-0.5">Permanently deletes all data. This action cannot be undone.</p>
+          </div>
+          <button className="flex items-center gap-2 text-sm font-bold text-red-600 border border-red-200 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+            <AlertTriangle className="w-4 h-4" /> Delete Account
+          </button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Main Shell ───────────────────────────────────────────────────────────────
+export default function SettingsClient({
+  userEmail, instituteName, instituteSlug, city,
+  isTrialExpired, daysLeft, isPaid, currentPlan,
+}: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>("general");
+
+  const TABS: { id: Tab; label: string; icon: any; desc: string }[] = [
+    { id: "general",  label: "General",       icon: Building2,  desc: "Profile & preferences"  },
+    { id: "billing",  label: "Billing & Plans", icon: CreditCard, desc: "Subscription & invoices" },
+    { id: "security", label: "Security",      icon: Shield,     desc: "Password & sessions"    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#f3f4f6]">
+
+      {/* ── Page Header ── */}
+      <div className="bg-gradient-to-r from-[#003366] via-[#004b87] to-[#0066cc] px-6 py-5">
+        <div className="max-w-7xl mx-auto">
+          <p className="text-white/60 text-[11px] font-semibold uppercase tracking-widest mb-1">Institute Settings</p>
+          <h1 className="text-2xl font-black text-white tracking-tight">{instituteName}</h1>
+          <p className="text-white/50 text-sm mt-0.5">Manage your institute profile, billing, and security settings.</p>
+        </div>
+      </div>
+
+      {/* ── Tab Layout ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+
+          {/* Left: Tab Navigation */}
+          <nav className="lg:w-64 shrink-0 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Navigation</p>
+            </div>
+            <div className="p-2 space-y-0.5">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all group ${
+                    activeTab === tab.id
+                      ? "bg-blue-50 border-l-4 border-[#0055a5] pl-2.5"
+                      : "hover:bg-slate-50 border-l-4 border-transparent"
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                    activeTab === tab.id ? "bg-[#0055a5]" : "bg-slate-100 group-hover:bg-slate-200"
+                  }`}>
+                    <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? "text-white" : "text-slate-500"}`} />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-bold transition-colors ${
+                      activeTab === tab.id ? "text-[#0055a5]" : "text-slate-700"
+                    }`}>{tab.label}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{tab.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Account Mini-card */}
+            <div className="m-2 mt-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wide mb-1">Logged in as</p>
+              <p className="text-xs font-bold text-slate-700 truncate">{userEmail}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">ID: {instituteSlug}</p>
+            </div>
+          </nav>
+
+          {/* Right: Content */}
+          <div className="flex-1 min-w-0">
+            {activeTab === "general" && (
+              <GeneralTab instituteName={instituteName} userEmail={userEmail} city={city} />
+            )}
+            {activeTab === "billing" && (
+              <BillingTab isPaid={isPaid} currentPlan={currentPlan} daysLeft={daysLeft} isTrialExpired={isTrialExpired} />
+            )}
+            {activeTab === "security" && <SecurityTab />}
+          </div>
+        </div>
       </div>
     </div>
   );

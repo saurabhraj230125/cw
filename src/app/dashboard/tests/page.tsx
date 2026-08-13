@@ -11,6 +11,9 @@ import {
   getExamQuestions, getExamAttempts, toggleResultsPublishAction 
 } from "../../actions/academic-actions";
 
+// 🚨 IMPORT THE BANNER
+import StudentPortalBanner from "../../../components/StudentPortalBanner";
+
 export default function TestSchedulerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -277,71 +280,77 @@ export default function TestSchedulerPage() {
         </h2>
       </div>
 
-      <div className="flex-1 p-6 max-w-[1400px] mx-auto w-full grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-1">
-          <div className="bg-white border border-erp-border rounded-erp shadow-sm p-6 space-y-5 sticky top-6">
-            <h3 className="text-erp-md font-bold text-gray-800 uppercase border-b border-erp-borderLight pb-2">Schedule CBT Exam</h3>
-            
-            <div className="space-y-1.5">
-              <label className="text-erp-sm font-bold text-gray-700">Target Batch</label>
-              <select value={testBatch} onChange={e => setTestBatch(e.target.value)} className="w-full border p-2 focus:border-cw-blue outline-none shadow-inner rounded-sm bg-white cursor-pointer">
-                <option value="">-- Select Target Batch --</option>
-                {batches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-erp-sm font-bold text-gray-700">Exam Title</label>
-              <input type="text" value={testTitle} onChange={e => setTestTitle(e.target.value)} placeholder="e.g. NTA JEE Mains Mock 01" className="w-full border p-2 shadow-inner focus:border-cw-blue outline-none rounded-sm" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-erp-sm font-bold text-gray-700">Date</label>
-                <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} className="w-full border p-2 focus:border-cw-blue shadow-inner outline-none rounded-sm cursor-pointer" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-erp-sm font-bold text-gray-700">Duration (Mins)</label>
-                <input type="number" value={testDuration} onChange={e => setTestDuration(e.target.value)} className="w-full border p-2 focus:border-cw-blue shadow-inner outline-none rounded-sm font-bold text-cw-blueDark" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-erp-sm font-bold text-gray-700">Syllabus</label>
-              <textarea value={testSyllabus} onChange={e => setTestSyllabus(e.target.value)} rows={2} className="w-full border p-2 focus:border-cw-blue shadow-inner outline-none rounded-sm resize-none"></textarea>
-            </div>
-            <button onClick={handleScheduleTest} disabled={isSaving || !testBatch} className="w-full bg-cw-blue text-white py-2.5 font-bold rounded-erp mt-4 hover:bg-cw-blueDark shadow-erp-button transition-colors">
-              Deploy Exam Container
-            </button>
-          </div>
-        </div>
+      <div className="flex-1 p-6 max-w-[1400px] mx-auto w-full">
+        
+        {/* 🚨 THE STUDENT PORTAL BANNER */}
+        <StudentPortalBanner />
 
-        <div className="xl:col-span-2">
-          <div className="bg-white border border-erp-border rounded-erp shadow-sm overflow-hidden">
-            <div className="bg-erp-header px-5 py-3 border-b border-erp-border flex justify-between items-center">
-              <h3 className="text-erp-md font-bold text-gray-800 uppercase">Exam Control Center</h3>
-            </div>
-            <div className="divide-y divide-erp-borderLight max-h-[700px] overflow-y-auto p-4 space-y-3">
-              {tests.length === 0 ? <div className="text-center py-20 text-gray-500 italic">No exams scheduled.</div> : tests.map(test => (
-                <div key={test.id} className="border border-erp-border rounded-erp p-5 flex items-center justify-between hover:border-cw-blue transition-colors bg-white shadow-sm group">
-                  <div className="flex gap-5">
-                    <div className="w-16 h-16 rounded-sm bg-gray-50 border border-gray-200 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">{new Date(test.test_date).toLocaleString('default', { month: 'short' })}</span>
-                      <span className="text-2xl font-bold text-cw-blueDark leading-none">{new Date(test.test_date).getDate()}</span>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h4 className="font-bold text-gray-900 text-lg">{test.title}</h4>
-                        {test.is_live && <span className="bg-cw-green text-white text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-1 animate-pulse"><PlayCircle className="w-3 h-3"/> Live</span>}
-                      </div>
-                      <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wide text-gray-500">
-                        <span className="bg-gray-100 px-2 py-0.5 rounded-sm">Batch: {test.batch_name}</span>
-                        <span>{test.duration_minutes || 180} Mins</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button onClick={() => openExamManager(test)} className="bg-pastel-blueBg text-cw-blue border border-pastel-blueBorder hover:bg-cw-blue hover:text-white px-5 py-2 rounded-erp font-bold text-sm transition-all shadow-sm flex items-center gap-2">
-                    <Settings className="w-4 h-4" /> Manage Exam
-                  </button>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-1">
+            <div className="bg-white border border-erp-border rounded-erp shadow-sm p-6 space-y-5 sticky top-6">
+              <h3 className="text-erp-md font-bold text-gray-800 uppercase border-b border-erp-borderLight pb-2">Schedule CBT Exam</h3>
+              
+              <div className="space-y-1.5">
+                <label className="text-erp-sm font-bold text-gray-700">Target Batch</label>
+                <select value={testBatch} onChange={e => setTestBatch(e.target.value)} className="w-full border p-2 focus:border-cw-blue outline-none shadow-inner rounded-sm bg-white cursor-pointer">
+                  <option value="">-- Select Target Batch --</option>
+                  {batches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-erp-sm font-bold text-gray-700">Exam Title</label>
+                <input type="text" value={testTitle} onChange={e => setTestTitle(e.target.value)} placeholder="e.g. NTA JEE Mains Mock 01" className="w-full border p-2 shadow-inner focus:border-cw-blue outline-none rounded-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-erp-sm font-bold text-gray-700">Date</label>
+                  <input type="date" value={testDate} onChange={e => setTestDate(e.target.value)} className="w-full border p-2 focus:border-cw-blue shadow-inner outline-none rounded-sm cursor-pointer" />
                 </div>
-              ))}
+                <div className="space-y-1.5">
+                  <label className="text-erp-sm font-bold text-gray-700">Duration (Mins)</label>
+                  <input type="number" value={testDuration} onChange={e => setTestDuration(e.target.value)} className="w-full border p-2 focus:border-cw-blue shadow-inner outline-none rounded-sm font-bold text-cw-blueDark" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-erp-sm font-bold text-gray-700">Syllabus</label>
+                <textarea value={testSyllabus} onChange={e => setTestSyllabus(e.target.value)} rows={2} className="w-full border p-2 focus:border-cw-blue shadow-inner outline-none rounded-sm resize-none"></textarea>
+              </div>
+              <button onClick={handleScheduleTest} disabled={isSaving || !testBatch} className="w-full bg-cw-blue text-white py-2.5 font-bold rounded-erp mt-4 hover:bg-cw-blueDark shadow-erp-button transition-colors">
+                Deploy Exam Container
+              </button>
+            </div>
+          </div>
+
+          <div className="xl:col-span-2">
+            <div className="bg-white border border-erp-border rounded-erp shadow-sm overflow-hidden">
+              <div className="bg-erp-header px-5 py-3 border-b border-erp-border flex justify-between items-center">
+                <h3 className="text-erp-md font-bold text-gray-800 uppercase">Exam Control Center</h3>
+              </div>
+              <div className="divide-y divide-erp-borderLight max-h-[700px] overflow-y-auto p-4 space-y-3">
+                {tests.length === 0 ? <div className="text-center py-20 text-gray-500 italic">No exams scheduled.</div> : tests.map(test => (
+                  <div key={test.id} className="border border-erp-border rounded-erp p-5 flex items-center justify-between hover:border-cw-blue transition-colors bg-white shadow-sm group">
+                    <div className="flex gap-5">
+                      <div className="w-16 h-16 rounded-sm bg-gray-50 border border-gray-200 flex flex-col items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">{new Date(test.test_date).toLocaleString('default', { month: 'short' })}</span>
+                        <span className="text-2xl font-bold text-cw-blueDark leading-none">{new Date(test.test_date).getDate()}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <h4 className="font-bold text-gray-900 text-lg">{test.title}</h4>
+                          {test.is_live && <span className="bg-cw-green text-white text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-1 animate-pulse"><PlayCircle className="w-3 h-3"/> Live</span>}
+                        </div>
+                        <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wide text-gray-500">
+                          <span className="bg-gray-100 px-2 py-0.5 rounded-sm">Batch: {test.batch_name}</span>
+                          <span>{test.duration_minutes || 180} Mins</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => openExamManager(test)} className="bg-pastel-blueBg text-cw-blue border border-pastel-blueBorder hover:bg-cw-blue hover:text-white px-5 py-2 rounded-erp font-bold text-sm transition-all shadow-sm flex items-center gap-2">
+                      <Settings className="w-4 h-4" /> Manage Exam
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

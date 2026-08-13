@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "../../lib/supabase/server";
 import { 
   UserCircle, Users, CalendarDays, Wallet, 
-  Calculator, BarChart3, MessageSquare, BookOpen, 
+  Calculator, BarChart3, BookOpen, 
   Trophy, GraduationCap, BellRing, Settings,
   Building2, LayoutGrid
 } from "lucide-react";
@@ -34,9 +34,7 @@ export default async function OwnerDashboardPage() {
     { name: "Manage Faculty", icon: Users, color: "text-[#1565C0]", href: "/dashboard/faculty" },
     { name: "Batch Schedule", icon: CalendarDays, color: "text-[#E65100]", href: "/dashboard/attendance" },
     { name: "Fee Collections", icon: Wallet, color: "text-[#2E7D32]", href: "/dashboard/fees" },
-    { name: "Expense Ledger", icon: Calculator, color: "text-[#C62828]", href: "/dashboard/expenses" },
     { name: "Growth Analytics", icon: BarChart3, color: "text-[#6A1B9A]", href: "/dashboard/analytics" },
-    { name: "SMS Broadcast", icon: MessageSquare, color: "text-[#D84315]", href: "/dashboard/broadcast" },
     { name: "DPP & Material", icon: BookOpen, color: "text-[#4E342E]", href: "/dashboard/materials" },
     { name: "Test & Ranks", icon: Trophy, color: "text-[#00695C]", href: "/dashboard/tests" },
     { name: "Student CRM", icon: GraduationCap, color: "text-[#F57F17]", href: "/dashboard/students" },
@@ -47,26 +45,26 @@ export default async function OwnerDashboardPage() {
   return (
     <div className="w-full bg-[#f3f4f6] min-h-screen font-sans pb-10">
       
-      <div className="bg-white shadow-sm border-b border-gray-300">
-        <div className="px-6 py-2.5 border-b border-gray-200">
-          <h1 className="text-[#0055a5] text-[15px] font-bold uppercase tracking-wider">
-            WELCOME {user.email?.split('@')[0] || "DIRECTOR"}
-          </h1>
-        </div>
-        <div className="px-6 py-3 bg-[#f8f9fa] flex justify-between items-center">
-          <p className="text-gray-900 text-[16px] font-semibold flex items-center gap-2">
-            <LayoutGrid className="w-5 h-5 text-[#0055a5]" /> Executive Control Panel
-          </p>
+      {/* ── Welcome Bar ── */}
+      <div className="bg-gradient-to-r from-[#003366] via-[#004b87] to-[#0066cc] shadow-md">
+        <div className="px-6 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-white/70 text-[11px] font-semibold uppercase tracking-widest">Executive Control Panel</p>
+            <h1 className="text-white text-xl font-black tracking-wide mt-0.5">
+              Welcome back, {user.email?.split("@")[0]?.toUpperCase() || "DIRECTOR"}
+            </h1>
+          </div>
+          <LayoutGrid className="w-8 h-8 text-white/30 hidden sm:block" />
         </div>
       </div>
 
       <div className="p-4 sm:p-6 flex flex-col xl:flex-row gap-6 items-start max-w-[1600px] mx-auto">
         
-        <div className="flex-1 bg-white border border-gray-300 shadow-sm w-full xl:w-auto overflow-hidden">
+        {/* ── Full Workspace Grid ── */}
+        <div className="flex-1 bg-white border border-gray-300 shadow-sm overflow-hidden rounded-xl">
           <div className="bg-[#eef5fa] px-6 py-3 border-b border-gray-300">
-            <h2 className="text-[#0055a5] text-[14px] font-bold uppercase tracking-wide">Workspace Modules</h2>
+            <h2 className="text-[#0055a5] text-[13px] font-bold uppercase tracking-wide">All Workspace Modules</h2>
           </div>
-          
           <div className="p-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-y-12 gap-x-8">
               {gridItems.map((item, index) => (

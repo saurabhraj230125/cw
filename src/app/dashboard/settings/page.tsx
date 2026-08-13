@@ -3,6 +3,8 @@ import { createClient } from "../../../lib/supabase/server";
 import SettingsClient from "./SettingsClient";
 import { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Institute Settings | CoachingWala ERP",
   description: "Manage your institute configuration, branding, and SaaS billing.",
@@ -16,7 +18,6 @@ export default async function SettingsPage() {
 
   const user = authData.user;
 
-  // 1. Fetch Membership & Institute Data
   const { data: membership, error: membershipError } = await supabase
     .from("core_memberships")
     .select(`
@@ -38,23 +39,16 @@ export default async function SettingsPage() {
   const safeCity = branchData?.city || "Bokaro";
   const safeEmail = user.email || "admin@futureq.com";
 
+  // Check if they are paid
   const isPaid = instituteData?.subscription_status === 'active';
   const currentPlan = instituteData?.subscription_plan || 'Free Trial';
 
   const createdAt = new Date(instituteData?.created_at || new Date());
-  const expiresAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const trialExpiresAt = new Date(createdAt.getTime() + 7 * 24 * 60 * 60 * 1000);
   const now = new Date();
   
-  const isTrialExpired = !isPaid && (now > expiresAt);
-  const daysLeft = (isPaid || isTrialExpired) ? 0 : Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-  // 2. 🚨 CRITICAL FIX: Look for "invoice_requested" instead of "pending"
-  const { data: pendingPayment } = await supabase
-    .from("core_payments")
-    .select("*")
-    .eq("institute_id", membership.institute_id)
-    .in("status", ["pending", "invoice_requested"]) // catches both just in case
-    .maybeSingle();
+  const isTrialExpired = !isPaid && (now > trialExpiresAt);
+  const daysLeft = (isPaid || isTrialExpired) ? 0 : Math.ceil((trialExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <SettingsClient 
@@ -66,7 +60,6 @@ export default async function SettingsPage() {
       daysLeft={daysLeft}
       isPaid={isPaid}
       currentPlan={currentPlan}
-      activePendingPayment={pendingPayment || null} 
     />
   );
 }

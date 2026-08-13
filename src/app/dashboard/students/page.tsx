@@ -114,7 +114,7 @@ export default function StudentDirectoryPage() {
           </button>
           <Link 
             href="/dashboard/enquiries/new" 
-            className="bg-cw-green border border-[#005000] text-white px-5 py-1.5 rounded-erp font-bold hover:bg-[#005000] transition-colors shadow-erp-button flex items-center gap-1.5 text-erp-sm"
+            className="bg-cw-green border border-[#005000] text-white px-5 py-1.5 rounded-erp font-bold hover:bg-[#005000] transition-colors shadow-erp-button flex items-center gap-1.5 text-erp-sm tour-add-student"
           >
             <Plus className="w-4 h-4" strokeWidth={3} /> New Admission
           </Link>

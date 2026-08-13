@@ -8,7 +8,6 @@ import {
 
 // IMPORT BACKEND ACTIONS
 import { getCourses, createCourseAction, deleteCourseAction } from "../../actions/course-actions";
-// We don't need getBranchSubjects anymore because we are providing the ULTIMATE MASTER DICTIONARY below.
 
 interface Subject {
   id: string;
@@ -96,7 +95,7 @@ export default function CoursesMasterPage() {
   const [courseName, setCourseName] = useState("");
   const [courseFee, setCourseFee] = useState("");
   
-  // Dual Listbox State (Using the Ultimate Dictionary)
+  // Dual Listbox State
   const [availableSubjects, setAvailableSubjects] = useState<Subject[]>(MASTER_SUBJECTS);
   const [selectedSubjects, setSelectedSubjects] = useState<Subject[]>([]);
   
@@ -104,7 +103,6 @@ export default function CoursesMasterPage() {
   const [searchSelected, setSearchSelected] = useState("");
   const [searchCourses, setSearchCourses] = useState("");
 
-  // --- 1. INITIAL LOAD ---
   useEffect(() => {
     loadData();
   }, []);
@@ -121,7 +119,6 @@ export default function CoursesMasterPage() {
     }
   }
 
-  // --- 2. LISTBOX HANDLERS ---
   const handleSelectSubject = (subject: Subject) => {
     setAvailableSubjects(prev => prev.filter(s => s.id !== subject.id));
     setSelectedSubjects(prev => [...prev, subject]);
@@ -142,7 +139,6 @@ export default function CoursesMasterPage() {
     setIsCreating(false);
   };
 
-  // --- 3. DATABASE CRUD HANDLERS ---
   const handleSaveCourse = async () => {
     if (!courseName.trim()) return alert("Please enter a Course Name.");
     if (!courseFee) return alert("Please enter the Course Fee.");
@@ -177,12 +173,10 @@ export default function CoursesMasterPage() {
     }
   };
 
-  // --- 4. FILTERS ---
   const filteredAvailable = useMemo(() => availableSubjects.filter(s => s.name.toLowerCase().includes(searchAvailable.toLowerCase())), [availableSubjects, searchAvailable]);
   const filteredSelected = useMemo(() => selectedSubjects.filter(s => s.name.toLowerCase().includes(searchSelected.toLowerCase())), [selectedSubjects, searchSelected]);
   const filteredCourses = useMemo(() => courses.filter(c => c.name.toLowerCase().includes(searchCourses.toLowerCase())), [courses, searchCourses]);
 
-  // Group Available Subjects by Category for Beautiful UI Polish
   const groupedAvailable = useMemo(() => {
     const groups: Record<string, Subject[]> = {};
     filteredAvailable.forEach(sub => {
@@ -192,15 +186,11 @@ export default function CoursesMasterPage() {
     return groups;
   }, [filteredAvailable]);
 
-
-  // ============================================================================
-  // RENDER UI
-  // ============================================================================
   return (
     <main className="min-h-screen bg-erp-bg font-sans flex flex-col pb-10">
       
-      {/* HEADER */}
-      <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex items-center justify-between shadow-sm z-10">
+      {/* 🚨 FIX: Removed 'z-10' from this header container to fix the Tour Stacking Trap */}
+      <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex items-center justify-between shadow-sm relative">
         <h2 className="text-erp-lg text-gray-900 font-bold uppercase tracking-wide flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-cw-blue" />
           {isCreating ? "Create New Course Bundle" : "Course Master Directory"}
@@ -208,7 +198,7 @@ export default function CoursesMasterPage() {
         {!isCreating && (
           <button 
             onClick={() => setIsCreating(true)}
-            className="bg-cw-green hover:bg-[#005000] text-white px-5 py-1.5 text-erp-sm font-bold rounded-erp flex items-center gap-1.5 shadow-erp-button transition-colors"
+            className="bg-cw-green hover:bg-[#005000] text-white px-5 py-1.5 text-erp-sm font-bold rounded-erp flex items-center gap-1.5 shadow-erp-button transition-colors tour-add-course"
           >
             <Plus className="w-4 h-4" strokeWidth={3} /> Add New Course
           </button>
@@ -217,7 +207,6 @@ export default function CoursesMasterPage() {
 
       <div className="flex-1 p-6 flex gap-6 max-w-[1400px] mx-auto w-full items-start">
         
-        {/* MAIN WORKSPACE */}
         <div className="flex-1 bg-white border border-erp-border rounded-erp shadow-sm overflow-hidden">
           
           {isLoading ? (
@@ -226,9 +215,6 @@ export default function CoursesMasterPage() {
                <p className="font-bold tracking-wide">Syncing Course Database...</p>
              </div>
           ) : !isCreating ? (
-            // ====================================================================
-            // VIEW MODE: COURSE DIRECTORY
-            // ====================================================================
             <div className="flex flex-col h-full">
               
               <div className="px-5 py-3 border-b border-erp-border bg-gray-50 flex items-center justify-between">
@@ -309,9 +295,6 @@ export default function CoursesMasterPage() {
             </div>
 
           ) : (
-            // ====================================================================
-            // CREATE MODE: NEW COURSE WIZARD
-            // ====================================================================
             <div className="flex flex-col h-full bg-gray-50/30">
               
               <div className="px-6 py-4 border-b border-erp-border bg-white flex items-center justify-between">
@@ -335,7 +318,6 @@ export default function CoursesMasterPage() {
 
               <div className="p-8 max-w-4xl space-y-8">
                 
-                {/* Basic Details */}
                 <div className="bg-white border border-erp-border p-6 rounded-erp shadow-sm space-y-5">
                   <h3 className="text-erp-sm font-bold text-cw-blue uppercase tracking-wider border-b border-erp-borderLight pb-2 flex items-center gap-2">
                     <Layers className="w-4 h-4" /> Course Identity & Financials
@@ -373,7 +355,6 @@ export default function CoursesMasterPage() {
                   </div>
                 </div>
 
-                {/* Ultimate Subject Selector */}
                 <div className="bg-white border border-erp-border p-6 rounded-erp shadow-sm space-y-4">
                   <div className="flex items-center justify-between border-b border-erp-borderLight pb-2">
                     <h3 className="text-erp-sm font-bold text-cw-blue uppercase tracking-wider flex items-center gap-2">
@@ -386,7 +367,6 @@ export default function CoursesMasterPage() {
                   
                   <div className="flex items-stretch justify-center gap-4 h-[400px]">
                     
-                    {/* AVAILABLE SUBJECTS (Grouped & Searchable) */}
                     <div className="flex-1 border border-erp-border rounded-sm flex flex-col overflow-hidden bg-gray-50 shadow-inner">
                       <div className="bg-gray-200 border-b border-erp-border px-3 py-2 flex items-center justify-between">
                         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Master Subject Library</span>
@@ -429,14 +409,12 @@ export default function CoursesMasterPage() {
                       </div>
                     </div>
 
-                    {/* TRANSFER VISUAL */}
                     <div className="flex flex-col justify-center items-center px-2">
                       <div className="bg-white p-2 rounded-full border border-gray-300 shadow-sm">
                         <ArrowRightLeft className="w-4 h-4 text-cw-blue" />
                       </div>
                     </div>
 
-                    {/* SELECTED SUBJECTS */}
                     <div className="flex-1 border border-cw-blue rounded-sm flex flex-col overflow-hidden bg-pastel-blueBg/20 shadow-[0_0_10px_rgba(0,102,204,0.05)]">
                       <div className="bg-cw-blue border-b border-cw-blueDark px-3 py-2 flex items-center justify-between text-white">
                         <span className="text-xs font-bold uppercase tracking-wide">Included in this Course</span>
@@ -484,7 +462,6 @@ export default function CoursesMasterPage() {
           )}
         </div>
 
-        {/* 3. RIGHT SIDEBAR (Intelligent Tips & Analytics) */}
         <div className="w-[300px] shrink-0 space-y-6 hidden xl:block">
           
           {!isCreating ? (

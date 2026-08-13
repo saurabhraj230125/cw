@@ -223,7 +223,7 @@ export default function BatchesMasterPage() {
         {!isCreating && (
           <button 
             onClick={() => setIsCreating(true)}
-            className="bg-cw-blue hover:bg-cw-blueDark text-white px-5 py-1.5 text-erp-sm font-bold rounded-erp flex items-center gap-1.5 shadow-sm transition-colors"
+            className="bg-cw-blue hover:bg-cw-blueDark text-white px-5 py-1.5 text-erp-sm font-bold rounded-erp flex items-center gap-1.5 shadow-sm transition-colors tour-add-batch"
           >
             <Plus className="w-4 h-4" strokeWidth={3} /> New Batch
           </button>
