@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Building2, ArrowRight, Loader2, Sparkles, 
-  Server, CheckCircle2, AlertTriangle, ShieldCheck, 
+import {
+  Building2, ArrowRight, Loader2, Sparkles,
+  Server, CheckCircle2, AlertTriangle, ShieldCheck,
   Database, Lock, LayoutDashboard, FileText,
-  MapPin, Users, Target, BookOpen, Wallet, CalendarClock
+  MapPin, Users, Target, BookOpen, Wallet, CalendarClock,
+  Search, X, Plus, GraduationCap, FlaskConical, Landmark,
+  Briefcase, Scale
 } from "lucide-react";
 import { completeOnboardingAction } from "../../app/actions/owner-auth";
 
@@ -51,47 +53,222 @@ const WIZARD_STEPS = [
   }
 ];
 
+// ============================================================
+// CITY DATA — Coaching Hubs First
+// ============================================================
+const CITY_LIST = [
+  "Kota", "Patna", "Sikar", "Indore", "Jaipur", "Pune", "Hyderabad", "Delhi",
+  "Bokaro", "Gorakhpur", "Varanasi", "Lucknow", "Prayagraj", "Kanpur",
+  "Ranchi", "Gwalior", "Chandigarh", "Bhubaneswar",
+  "Mumbai", "Bangalore", "Chennai", "Kolkata", "Ahmedabad", "Surat", "Nagpur",
+  "Bhopal", "Visakhapatnam", "Jodhpur", "Udaipur", "Ajmer",
+  "Agra", "Meerut", "Faridabad", "Ghaziabad", "Noida", "Allahabad",
+  "Amritsar", "Ludhiana", "Jalandhar", "Coimbatore", "Madurai"
+];
+
+// ============================================================
+// EXAM TAXONOMY — Indian Coaching Market
+// ============================================================
+type ExamGroup = { label: string; icon: React.ElementType; color: string; exams: string[] };
+const EXAM_GROUPS: ExamGroup[] = [
+  {
+    label: "Engineering",
+    icon: FlaskConical,
+    color: "#0055a5",
+    exams: ["JEE Main", "JEE Advanced", "MHT-CET", "BITSAT"]
+  },
+  {
+    label: "Medical",
+    icon: GraduationCap,
+    color: "#cc0000",
+    exams: ["NEET-UG"]
+  },
+  {
+    label: "School & Foundation",
+    icon: BookOpen,
+    color: "#008000",
+    exams: ["CBSE (6th-10th)", "CBSE (11th-12th)", "ICSE", "State Board", "Olympiads", "NTSE"]
+  },
+  {
+    label: "University Entrance",
+    icon: Landmark,
+    color: "#6d28d9",
+    exams: ["CUET UG", "CUET PG"]
+  },
+  {
+    label: "Govt. Exams & Defence",
+    icon: Briefcase,
+    color: "#b45309",
+    exams: ["NDA", "SSC", "UPSC", "State PCS", "Banking (IBPS/SBI)"]
+  },
+  {
+    label: "Commerce & Law",
+    icon: Scale,
+    color: "#0891b2",
+    exams: ["CA Foundation", "CLAT"]
+  },
+];
+
+// ============================================================
+// CITY SEARCH MODAL COMPONENT
+// ============================================================
+function CitySearchModal({ onSelect, onClose }: { onSelect: (city: string) => void; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const [customCity, setCustomCity] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+
+  const filtered = useMemo(() =>
+    CITY_LIST.filter(c => c.toLowerCase().includes(query.toLowerCase())),
+    [query]
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-black text-slate-800">Apna Sheher Chunein / Select City</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+              placeholder="City ka naam type karein..."
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:border-[#0055a5] focus:ring-2 focus:ring-[#0055a5]/10 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* City Grid */}
+        <div className="overflow-y-auto flex-1 p-4">
+          {filtered.length === 0 && !showCustom ? (
+            <div className="text-center py-6">
+              <p className="text-gray-400 text-sm font-medium mb-3">Koi city nahi mili.</p>
+              <button
+                onClick={() => setShowCustom(true)}
+                className="flex items-center gap-1.5 mx-auto text-[#0055a5] font-bold text-sm border border-[#0055a5] px-4 py-2 rounded-lg hover:bg-blue-50 transition-all"
+              >
+                <Plus className="w-4 h-4" /> Add Custom City
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {filtered.map(city => (
+                <button
+                  key={city}
+                  onClick={() => onSelect(city)}
+                  className="text-sm font-semibold text-slate-700 bg-gray-50 hover:bg-[#0055a5] hover:text-white border border-gray-200 hover:border-[#0055a5] rounded-xl px-3 py-2.5 text-center transition-all duration-150 active:scale-95"
+                >
+                  {city}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Add Custom City */}
+        <div className="border-t border-gray-100 px-4 py-3">
+          {!showCustom ? (
+            <button
+              onClick={() => setShowCustom(true)}
+              className="w-full flex items-center justify-center gap-1.5 text-sm font-bold text-gray-500 hover:text-[#0055a5] transition-colors py-1"
+            >
+              <Plus className="w-4 h-4" /> Add Custom City / Koi aur sheher add karein
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={customCity}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomCity(e.target.value)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter" && customCity.trim()) onSelect(customCity.trim()); }}
+                placeholder="Custom city name..."
+                className="flex-1 border border-gray-300 px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-[#0055a5] transition-all"
+              />
+              <button
+                onClick={() => { if (customCity.trim()) onSelect(customCity.trim()); }}
+                className="bg-[#0055a5] text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#004080] transition-all"
+              >
+                Add
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OnboardingWizard() {
   const router = useRouter();
-  
+
   // Wizard State
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Form Data State
   const [agreedPrivacy, setAgreedPrivacy] = useState(false);
   const [instituteName, setInstituteName] = useState("");
   const [location, setLocation] = useState("");
-  const [category, setCategory] = useState("");
+  const [selectedExams, setSelectedExams] = useState<string[]>([]);
+  const [customStream, setCustomStream] = useState("");
+  const [showCustomStream, setShowCustomStream] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
   const [studentCount, setStudentCount] = useState("");
   const [mainProblem, setMainProblem] = useState("");
-  
+
   // Provisioning State
   const [provisionStep, setProvisionStep] = useState(0);
+
+  const toggleExam = (exam: string) => {
+    setSelectedExams(prev =>
+      prev.includes(exam) ? prev.filter(e => e !== exam) : [...prev, exam]
+    );
+  };
+
+  const addCustomStream = () => {
+    const trimmed = customStream.trim();
+    if (trimmed && !selectedExams.includes(trimmed)) {
+      setSelectedExams(prev => [...prev, trimmed]);
+    }
+    setCustomStream("");
+    setShowCustomStream(false);
+  };
 
   // Handle the final submission (Triggered at Step 4)
   const handleSetup = async () => {
     const cleanName = instituteName.trim();
     if (!cleanName) return;
-    
+
     setError(null);
     setStep(5); // Move to final provisioning screen
 
     try {
       // 1. Trigger backend DB creation passing ALL collected data
       await completeOnboardingAction(
-        cleanName, 
-        location, 
-        category, 
-        studentCount, 
+        cleanName,
+        location,
+        selectedExams.join(", "), // pass exams as comma-separated string
+        studentCount,
         mainProblem
       );
-      
+
       // 2. Cinematic Loading Sequence
       setTimeout(() => setProvisionStep(1), 1200);
       setTimeout(() => setProvisionStep(2), 2400);
       setTimeout(() => setProvisionStep(3), 3600);
-      
+
       // 3. Drop into Dashboard
       setTimeout(() => {
         router.push("/dashboard");
@@ -108,16 +285,24 @@ export default function OnboardingWizard() {
 
   return (
     <main className="min-h-screen flex font-sans selection:bg-blue-100 selection:text-blue-900 bg-slate-50">
-      
+
+      {/* City Search Modal Portal */}
+      {showCityModal && (
+        <CitySearchModal
+          onSelect={(city: string) => { setLocation(city); setShowCityModal(false); }}
+          onClose={() => setShowCityModal(false)}
+        />
+      )}
+
       {/* ========================================================= */}
       {/* LEFT SIDE: Dynamic Guide Panel */}
       {/* ========================================================= */}
       <div className="hidden lg:flex flex-col w-[45%] bg-gradient-to-br from-[#003B73] to-[#0074B7] text-white p-12 relative overflow-hidden z-10 transition-colors duration-700">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
         <div className="absolute top-[-20%] left-[-20%] w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
-        
+
         <div className="relative z-10 flex flex-col h-full justify-center max-w-lg mx-auto">
-          
+
           {/* Step Indicator */}
           <div className="flex gap-2 mb-12">
             {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -140,7 +325,7 @@ export default function OnboardingWizard() {
                 </div>
                 <h1 className="text-sm font-bold tracking-widest uppercase opacity-90">Step {step + 1} of 6</h1>
               </div>
-              
+
               <h2 className="text-5xl font-extrabold leading-[1.1] mb-6 drop-shadow-sm tracking-tight">
                 {currentGuide.title}
               </h2>
@@ -157,16 +342,16 @@ export default function OnboardingWizard() {
       {/* ========================================================= */}
       <div className="w-full lg:w-[55%] flex flex-col justify-center px-8 sm:px-12 py-12 relative overflow-y-auto">
         <div className="max-w-md w-full mx-auto relative">
-          
+
           {error && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 bg-[#ffebee] border border-[#ffcdd2] p-4 text-sm font-bold text-[#cc0000] flex items-start gap-2 rounded-xl shadow-sm">
-              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" /> 
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
               <span>{error}</span>
             </motion.div>
           )}
 
           <AnimatePresence mode="wait">
-            
+
             {/* STEP 0: WELCOME */}
             {step === 0 && (
               <motion.div key="step-0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
@@ -210,29 +395,51 @@ export default function OnboardingWizard() {
               </motion.div>
             )}
 
-            {/* STEP 2: INSTITUTE NAME & LOCATION */}
+            {/* STEP 2: INSTITUTE NAME & LOCATION (DEEP FIX APPLIED FOR NESTED BUTTONS) */}
             {step === 2 && (
               <motion.div key="step-2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div className="w-16 h-16 bg-[#e6f2ff] rounded-2xl flex items-center justify-center mb-6 border border-[#0055a5]/20 shadow-inner">
                   <Building2 className="w-8 h-8 text-[#0055a5]" />
                 </div>
                 <h3 className="text-3xl font-bold text-slate-900 tracking-tight">Institute Details</h3>
-                
+
                 <div className="space-y-5 mt-6">
                   <div className="space-y-2">
                     <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">Official Institute Name</label>
                     <div className="relative">
                       <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input type="text" value={instituteName} onChange={(e) => setInstituteName(e.target.value)} placeholder="e.g. Apex Academy" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-lg text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
+                      <input type="text" value={instituteName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInstituteName(e.target.value)} placeholder="e.g. Apex Academy" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-lg text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
                     </div>
                   </div>
+
                   <div className="space-y-2">
                     <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">City / Location</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Kota, Rajasthan" className="w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl focus:bg-white focus:border-[#0055a5] focus:ring-4 focus:ring-[#0055a5]/10 outline-none transition-all font-bold text-slate-900 placeholder:font-medium placeholder:text-gray-400 shadow-sm" />
+
+                    {/* FIXED: Replaced outer <button> with a <div> to fix hydration error */}
+                    <div
+                      onClick={() => setShowCityModal(true)}
+                      className={`w-full flex items-center gap-3 px-4 py-4 bg-white border-2 rounded-xl transition-all text-left shadow-sm cursor-pointer ${location ? "border-[#0055a5] bg-[#e6f2ff]/30" : "border-gray-300 hover:border-[#0055a5]/50"
+                        }`}
+                    >
+                      <MapPin className={`w-5 h-5 shrink-0 ${location ? "text-[#0055a5]" : "text-gray-400"}`} />
+                      <span className={`font-bold text-lg flex-1 ${location ? "text-[#0055a5]" : "text-gray-400"}`}>
+                        {location || "Select your city..."}
+                      </span>
+
+                      {location && (
+                        <button
+                          type="button"
+                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); setLocation(""); }}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
+
+                    <p className="text-xs text-gray-400 ml-1">Kota, Patna, Sikar ya koi bhi sheher chunein</p>
                   </div>
+
                   <div className="flex gap-4 mt-8">
                     <button onClick={() => setStep(1)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
                     <button onClick={() => setStep(3)} disabled={!instituteName.trim() || !location.trim()} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
@@ -243,40 +450,118 @@ export default function OnboardingWizard() {
               </motion.div>
             )}
 
-            {/* STEP 3: CATEGORY & SIZE */}
+            {/* STEP 3: CATEGORY & SIZE — Deeply Improved Spacious UI */}
             {step === 3 && (
               <motion.div key="step-3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                <h3 className="text-3xl font-bold text-slate-900 tracking-tight mb-6">Operations Setup</h3>
-                
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">What do you teach?</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {["JEE / NEET", "School Academics", "UPSC / Govt Exams", "Skill & IT Training"].map((cat) => (
-                        <button key={cat} onClick={() => setCategory(cat)} className={`p-4 rounded-xl border text-sm font-bold text-left transition-all ${category === cat ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-300 text-slate-700 hover:border-[#0055a5]/50'}`}>
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  <div className="space-y-3">
-                    <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">Total Active Students</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {["< 50", "50-200", "200-500", "500+"].map((count) => (
-                        <button key={count} onClick={() => setStudentCount(count)} className={`p-3 rounded-xl border text-sm font-bold text-center transition-all ${studentCount === count ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-300 text-slate-700 hover:border-[#0055a5]/50'}`}>
-                          {count}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div>
+                  <h3 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">Aap kya padhate hain?</h3>
+                  <p className="text-slate-500 text-sm font-medium">Select the exams you prepare students for (multiple allowed)</p>
+                </div>
 
-                  <div className="flex gap-4 mt-8">
-                    <button onClick={() => setStep(2)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
-                    <button onClick={() => setStep(4)} disabled={!category || !studentCount} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
-                      Next Step <ArrowRight className="w-5 h-5" />
+                {/* Clean, Card-Based Grid Layout for Exams */}
+                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 pb-4">
+                  {EXAM_GROUPS.map((group) => {
+                    const GroupIcon = group.icon;
+                    return (
+                      <div key={group.label} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex items-center gap-2.5 mb-4">
+                          <div className="p-2 rounded-xl" style={{ backgroundColor: `${group.color}15` }}>
+                            <GroupIcon className="w-5 h-5" style={{ color: group.color }} />
+                          </div>
+                          <span className="text-sm font-black uppercase tracking-widest" style={{ color: group.color }}>
+                            {group.label}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2.5">
+                          {group.exams.map(exam => {
+                            const isSelected = selectedExams.includes(exam);
+                            return (
+                              <button
+                                key={exam}
+                                type="button"
+                                onClick={() => toggleExam(exam)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all duration-200 active:scale-95 ${isSelected
+                                    ? "text-white shadow-md"
+                                    : "bg-white text-slate-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                  }`}
+                                style={isSelected ? { backgroundColor: group.color, borderColor: group.color } : {}}
+                              >
+                                {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                                {exam}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Custom Streams Output */}
+                  {selectedExams.filter(e => !EXAM_GROUPS.flatMap(g => g.exams).includes(e)).length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Custom Streams</h4>
+                      <div className="flex flex-wrap gap-2.5">
+                        {selectedExams.filter(e => !EXAM_GROUPS.flatMap(g => g.exams).includes(e)).map(custom => (
+                          <span key={custom} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-slate-800 text-white shadow-md">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            {custom}
+                            <button type="button" onClick={() => setSelectedExams(prev => prev.filter(e => e !== custom))} className="ml-1 opacity-70 hover:opacity-100 hover:text-red-300 transition-colors">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Custom Stream */}
+                <div className="pt-2">
+                  {!showCustomStream ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomStream(true)}
+                      className="w-full flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:text-[#0055a5] bg-white border border-gray-200 py-3 rounded-xl hover:border-[#0055a5] transition-all shadow-sm"
+                    >
+                      <Plus className="w-4 h-4" /> Add Custom Stream
                     </button>
+                  ) : (
+                    <div className="flex gap-2 bg-white p-2 rounded-2xl border border-[#0055a5] shadow-sm">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={customStream}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomStream(e.target.value)}
+                        onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") addCustomStream(); }}
+                        placeholder="e.g. NEET PG, CA Inter..."
+                        className="flex-1 bg-transparent px-3 py-2 text-sm font-bold focus:outline-none"
+                      />
+                      <button onClick={addCustomStream} className="bg-[#0055a5] text-white px-5 py-2 rounded-xl font-bold text-sm hover:bg-[#004080] transition-all">Add</button>
+                      <button onClick={() => setShowCustomStream(false)} className="text-gray-400 hover:text-gray-600 px-3 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-gray-200">
+                  <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">Total Active Students</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {["< 50", "50-200", "200-500", "500+"].map((count) => (
+                      <button key={count} onClick={() => setStudentCount(count)} className={`py-3.5 rounded-xl border-2 text-sm font-bold text-center transition-all ${studentCount === count ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-200 text-slate-700 hover:border-[#0055a5]/50'}`}>
+                        {count}
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button onClick={() => setStep(2)} className="w-1/3 bg-white text-slate-600 border border-gray-300 font-bold py-4 rounded-xl hover:bg-gray-50 transition-all">Back</button>
+                  <button onClick={() => setStep(4)} disabled={selectedExams.length === 0 || !studentCount} className="w-2/3 bg-[#0055a5] hover:bg-[#004080] disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 active:scale-[0.98]">
+                    Next Step <ArrowRight className="w-5 h-5" />
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -285,10 +570,10 @@ export default function OnboardingWizard() {
             {step === 4 && (
               <motion.div key="step-4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <h3 className="text-3xl font-bold text-slate-900 tracking-tight mb-6">Final Step</h3>
-                
+
                 <div className="space-y-4">
                   <label className="text-[12px] font-bold text-gray-600 uppercase tracking-widest ml-1">What is your biggest operational challenge right now?</label>
-                  
+
                   <div className="flex flex-col gap-3">
                     {[
                       { id: "fees", label: "Fee Collection & Missing Dues", icon: Wallet },
@@ -296,7 +581,7 @@ export default function OnboardingWizard() {
                       { id: "exams", label: "Managing Tests & Results", icon: BookOpen },
                       { id: "all", label: "Everything is a mess right now", icon: AlertTriangle }
                     ].map((prob) => (
-                      <button key={prob.id} onClick={() => setMainProblem(prob.id)} className={`p-4 rounded-xl border text-sm font-bold flex items-center gap-3 transition-all ${mainProblem === prob.id ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-300 text-slate-700 hover:border-[#0055a5]/50'}`}>
+                      <button key={prob.id} onClick={() => setMainProblem(prob.id)} className={`p-4 rounded-xl border-2 text-sm font-bold flex items-center gap-3 transition-all ${mainProblem === prob.id ? 'bg-[#0055a5] border-[#0055a5] text-white shadow-md' : 'bg-white border-gray-200 text-slate-700 hover:border-[#0055a5]/50'}`}>
                         <prob.icon className="w-5 h-5" /> {prob.label}
                       </button>
                     ))}
@@ -321,7 +606,7 @@ export default function OnboardingWizard() {
                     <Server className="w-10 h-10 text-[#0055a5] animate-pulse" />
                   </div>
                 </div>
-                
+
                 <h3 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">Provisioning Workspace...</h3>
                 <p className="text-sm font-bold text-slate-500 mb-8">Setting up infrastructure for <span className="text-[#0055a5]">{instituteName}</span></p>
 

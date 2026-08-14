@@ -7,7 +7,8 @@ import {
   ArrowLeft, User, Phone, MapPin, 
   BookOpen, Edit3, Download, GraduationCap, Percent, Wallet, AlertTriangle,
   Mail, Users, CreditCard, Receipt, CalendarClock, Tag, ShieldCheck, Plus, 
-  ShieldAlert, PowerOff, Trash2, Loader2, CalendarCheck, X, IndianRupee, CheckCircle2
+  ShieldAlert, PowerOff, Trash2, Loader2, CalendarCheck, X, IndianRupee, CheckCircle2,
+  ReceiptText
 } from "lucide-react";
 
 // Import the real database fetchers and actions
@@ -610,9 +611,14 @@ export default function StudentProfileView() {
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-cw-green">₹{Number(tx.amount).toLocaleString()}</td>
                       <td className="py-3 px-4 text-center">
-                        <button className="text-cw-blue hover:underline font-bold flex items-center justify-center gap-1 mx-auto text-[11px]">
-                          <Download className="w-3.5 h-3.5" /> Print
-                        </button>
+                        <Link
+                          href={`/dashboard/students/${studentId}/receipt/${tx.id}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold text-[#0055a5] border border-[#0055a5] rounded hover:bg-blue-50 transition-colors"
+                          title="View & Print Receipt"
+                        >
+                          <ReceiptText className="w-3.5 h-3.5" />
+                          View Receipt
+                        </Link>
                       </td>
                     </tr>
                   ))

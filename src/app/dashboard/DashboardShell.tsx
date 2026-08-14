@@ -3,19 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { 
-  LayoutDashboard, Users, CalendarCheck, Wallet, 
+import {
+  LayoutDashboard, Users, CalendarCheck, Wallet,
   BookOpen, CheckSquare, BellRing, BarChart3,
   Plus, User, Zap, Menu, X,
   Layers, BookMarked, Lock, Loader2, ChevronRight, AlertOctagon, ShieldCheck,
-  Phone, Settings, CreditCard, LogOut
+  Phone, Settings, CreditCard, LogOut, RefreshCw
 } from "lucide-react";
 import { logoutAction } from "../actions/owner-auth";
-import DashboardTour from "../../components/DashboardTour";
+import DashboardTour, { resetTour } from "../../components/DashboardTour";
 
-export default function DashboardShell({ 
+export default function DashboardShell({
   children, instituteName, isTrialExpired, daysLeft, isPaid, currentPlan
-}: { 
+}: {
   children: React.ReactNode; instituteName: string; isTrialExpired: boolean; daysLeft: number; isPaid: boolean; currentPlan: string;
 }) {
   const pathname = usePathname();
@@ -52,7 +52,7 @@ export default function DashboardShell({
   };
 
   const isBaseLocked = !isPaid && isTrialExpired;
-  const isPremiumLocked = !isPaid; 
+  const isPremiumLocked = !isPaid;
 
   const navigation = [
     { name: "Dashboard", href: isBaseLocked ? "/dashboard/settings" : "/dashboard", icon: LayoutDashboard, locked: isBaseLocked, tourClass: "tour-dashboard" },
@@ -84,12 +84,12 @@ export default function DashboardShell({
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
-          
+
           {/* 🚨 Added prefetch={false} to stop background 404s */}
           <Link prefetch={false} href={isBaseLocked ? "/dashboard/settings" : "/dashboard/enquiries/new"} className="tour-enquiry hidden lg:flex items-center gap-1.5 bg-[#4CAF50] hover:bg-[#45a049] text-white px-4 py-1.5 rounded-[2px] text-[13px] font-bold shadow-sm transition-all">
             <Plus className="w-4 h-4" strokeWidth={3} /> New Enquiry
           </Link>
-          
+
           <a href="tel:6306814355" className="hidden md:flex items-center gap-2.5 bg-white border border-[#cccccc] px-3 py-1.5 rounded-[4px] shadow-sm hover:border-[#0055a5] hover:shadow transition-all cursor-pointer mr-1">
             <div className="w-7 h-7 rounded-full bg-red-100/80 flex items-center justify-center shrink-0">
               <Phone className="w-3.5 h-3.5 text-gray-800 fill-gray-800" />
@@ -99,7 +99,7 @@ export default function DashboardShell({
               <span className="text-[13px] font-black text-gray-800 leading-none tracking-wide">6306814355</span>
             </div>
           </a>
-          
+
           {/* Profile Dropdown */}
           <div ref={profileRef} className="relative">
             <button
@@ -136,6 +136,16 @@ export default function DashboardShell({
                     <CreditCard className="w-4 h-4 text-slate-400" />
                     Billing &amp; Plan
                   </Link>
+                  <button
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      resetTour();
+                    }}
+                    className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4 text-amber-500" />
+                    Restart Dashboard Tour
+                  </button>
                 </div>
                 {/* Sign Out */}
                 <div className="border-t border-slate-100 py-1">
@@ -169,9 +179,8 @@ export default function DashboardShell({
                   key={item.name}
                   href={item.href}
                   onClick={handleNavClick}
-                  className={`flex items-center gap-3 px-4 py-3 text-[13px] border-b border-[#e0e0e0] transition-colors ${item.tourClass || ""} ${
-                    isActive ? "bg-[#e6f0fa] text-[#0055a5] font-bold border-l-4 border-l-[#0055a5]" : "text-gray-700 hover:bg-[#f5f5f5] border-l-4 border-l-transparent font-semibold"
-                  } ${item.locked ? "bg-slate-50/50 opacity-90" : ""}`}
+                  className={`flex items-center gap-3 px-4 py-3 text-[13px] border-b border-[#e0e0e0] transition-colors ${item.tourClass || ""} ${isActive ? "bg-[#e6f0fa] text-[#0055a5] font-bold border-l-4 border-l-[#0055a5]" : "text-gray-700 hover:bg-[#f5f5f5] border-l-4 border-l-transparent font-semibold"
+                    } ${item.locked ? "bg-slate-50/50 opacity-90" : ""}`}
                 >
                   <div className={`flex-shrink-0 ${isActive ? 'text-[#0055a5]' : 'text-[#666666]'}`}>
                     <item.icon className="h-[18px] w-[18px]" strokeWidth={2} />
@@ -197,15 +206,15 @@ export default function DashboardShell({
                 </div>
               </div>
             ) : (
-              <Link 
+              <Link
                 prefetch={false}
-                href="/dashboard/settings" 
+                href="/dashboard/settings"
                 onClick={handleNavClick}
                 className={`block mx-3 mt-6 mb-4 border shadow-sm transition-all rounded-[6px] overflow-hidden group cursor-pointer ${isTrialExpired ? 'border-red-300 bg-red-50' : 'border-[#0055a5]/20 bg-gradient-to-b from-[#ffffff] to-[#f8fafc]'}`}
               >
                 <div className={`p-2.5 border-b flex justify-between items-center bg-white ${isTrialExpired ? 'border-red-200' : 'border-[#0055a5]/10'}`}>
                   <span className={`font-bold text-[11px] uppercase tracking-wide flex items-center gap-1 ${isTrialExpired ? 'text-red-600' : 'text-[#cc0000]'}`}>
-                    {isTrialExpired ? <AlertOctagon className="w-3 h-3" /> : <Zap className="w-3 h-3 fill-[#cc0000]" />} 
+                    {isTrialExpired ? <AlertOctagon className="w-3 h-3" /> : <Zap className="w-3 h-3 fill-[#cc0000]" />}
                     {isTrialExpired ? 'Trial Expired' : 'Trial Active'}
                   </span>
                   <span className={`font-extrabold text-[11px] ${isTrialExpired ? 'text-red-600' : 'text-[#0055a5]'}`}>{daysLeft} Days Left</span>

@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { 
-  Search, Save, AlertTriangle, ChevronLeft, ChevronRight, 
-  CheckCircle2, MessageSquare, Loader2, RefreshCw, Users, Info
+import {
+  Search, Save, AlertTriangle, ChevronLeft, ChevronRight,
+  CheckCircle2, MessageSquare, Loader2, RefreshCw, Users, BookOpen
 } from "lucide-react";
 
 // IMPORT REAL DATABASE ACTIONS
 import { getActiveBatches, getAttendanceRoster, saveAttendanceAction } from "../../actions/attendance-actions";
 
-export type Status = "present" | "absent" | "late";
+export type Status = "present" | "absent" | "late" | "leave";
 
 export interface RosterStudent {
   id: string;
@@ -23,17 +23,19 @@ export default function AttendancePage() {
   // --- CORE STATE ---
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [batches, setBatches] = useState<string[]>([]);
-  const [selectedBatch, setSelectedBatch] = useState<string>("ALL"); 
+
+  // DEEP FIX: Default back to "ALL", but this time it is fully unlocked!
+  const [selectedBatch, setSelectedBatch] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  
+
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [attendanceData, setAttendanceData] = useState<Record<string, Status>>({});
-  
+
   // --- UI/UX STATE ---
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [isDirty, setIsDirty] = useState<boolean>(false); 
+  const [isDirty, setIsDirty] = useState<boolean>(false);
   const [sendSms, setSendSms] = useState<boolean>(true);
 
   const isAllBatchesView = selectedBatch === "ALL";
@@ -43,8 +45,8 @@ export default function AttendancePage() {
     async function init() {
       try {
         const fetchedBatches = await getActiveBatches();
-        setBatches(["ALL", ...fetchedBatches]); 
-        setSelectedBatch("ALL"); 
+        // Add "ALL" as the first option
+        setBatches(["ALL", ...(fetchedBatches || [])]);
       } catch (error) {
         console.error("Failed to initialize batches", error);
       } finally {
@@ -71,22 +73,22 @@ export default function AttendancePage() {
     if (!selectedBatch) return;
 
     let isMounted = true;
-    
+
     async function loadRoster() {
       setIsLoading(true);
       try {
         const data = await getAttendanceRoster(selectedBatch, selectedDate);
-        
+
         if (isMounted) {
           setStudents(data);
-          
+
           const savedState: Record<string, Status> = {};
           data.forEach((stu: RosterStudent) => {
             if (stu.status) savedState[stu.id] = stu.status;
           });
-          
+
           setAttendanceData(savedState);
-          setIsDirty(false); 
+          setIsDirty(false);
         }
       } catch (error) {
         console.error("Failed to load roster", error);
@@ -97,17 +99,15 @@ export default function AttendancePage() {
 
     loadRoster();
     return () => { isMounted = false; };
-  }, [selectedBatch, selectedDate]); 
+  }, [selectedBatch, selectedDate]);
 
-  // --- HANDLERS ---
+  // --- HANDLERS (READ-ONLY LOCKS COMPLETELY REMOVED) ---
   const toggleStatus = (studentId: string, status: Status) => {
-    if (isAllBatchesView) return; // Prevent marking in ALL view to protect DB integrity
     setAttendanceData(prev => ({ ...prev, [studentId]: status }));
     setIsDirty(true);
   };
 
   const markAllPresent = () => {
-    if (isAllBatchesView) return;
     const allPresent: Record<string, Status> = {};
     students.forEach((s: RosterStudent) => {
       allPresent[s.id] = "present";
@@ -133,7 +133,6 @@ export default function AttendancePage() {
   };
 
   const handleSave = async () => {
-    if (isAllBatchesView) return; // Hard guard
     if (Object.keys(attendanceData).length === 0) {
       alert("No attendance data marked.");
       return;
@@ -159,16 +158,19 @@ export default function AttendancePage() {
     return students.filter((s: RosterStudent) => {
       const safeName = s.name || "";
       const safeRoll = s.roll || "";
-      return safeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-             safeRoll.toLowerCase().includes(searchQuery.toLowerCase());
+      return safeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        safeRoll.toLowerCase().includes(searchQuery.toLowerCase());
     });
   }, [students, searchQuery]);
 
   const summary = useMemo(() => {
-    const counts = { present: 0, absent: 0, late: 0, unmarked: 0 };
+    const counts = { present: 0, absent: 0, late: 0, leave: 0, unmarked: 0 };
     students.forEach((s: RosterStudent) => {
       const status = attendanceData[s.id];
-      if (status) counts[status]++;
+      if (status === "present") counts.present++;
+      else if (status === "absent") counts.absent++;
+      else if (status === "late") counts.late++;
+      else if (status === "leave") counts.leave++;
       else counts.unmarked++;
     });
     return counts;
@@ -182,20 +184,20 @@ export default function AttendancePage() {
       <main className="min-h-screen bg-erp-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-cw-blue" />
-          <p className="text-gray-500 font-bold text-erp-md">Initializing Attendance Module...</p>
+          <p className="text-gray-500 font-bold text-erp-md">Loading Master Register...</p>
         </div>
       </main>
     );
   }
 
-  // --- EMPTY STATE ---
-  if (batches.length <= 1) { // Only "ALL" is in the list
+  // --- EMPTY STATE (NO BATCHES IN DB) ---
+  if (batches.length <= 1) {
     return (
       <main className="min-h-screen bg-erp-bg flex items-center justify-center">
         <div className="bg-white p-8 rounded-erp border border-erp-border shadow-sm text-center max-w-md">
           <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <h2 className="text-erp-lg font-bold text-gray-800 mb-2">No Active Batches</h2>
-          <p className="text-erp-base text-gray-600">You must complete a new student admission and strictly assign them to a batch before taking attendance.</p>
+          <p className="text-erp-base text-gray-600">You must create a batch in Batch Master and assign students before taking attendance.</p>
         </div>
       </main>
     );
@@ -203,11 +205,11 @@ export default function AttendancePage() {
 
   return (
     <main className="min-h-screen bg-erp-bg flex flex-col pb-10">
-      
+
       {/* 1. CLASSIC SUB-HEADER */}
       <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex justify-between items-center z-10 shadow-sm">
         <h2 className="text-erp-lg text-gray-900 font-bold uppercase tracking-wide">
-          Master Attendance Register
+          Daily Attendance Register
         </h2>
         {isDirty && (
           <span className="text-cw-red text-erp-sm font-bold flex items-center gap-1.5 px-3 py-1.5 bg-pastel-redBg rounded-erp border border-pastel-redBorder animate-in fade-in zoom-in-95 duration-200">
@@ -218,30 +220,34 @@ export default function AttendancePage() {
 
       {/* 2. FUNCTIONAL TOOLBAR */}
       <div className="px-6 py-3 bg-white border-b border-erp-border flex flex-wrap items-center gap-6 shrink-0 z-10 shadow-sm relative">
-        
-        {/* Batch Selector */}
+
+        {/* Localized Batch Selector */}
         <div className="flex items-center gap-2">
-          <label className="text-erp-sm font-bold text-gray-600 uppercase">Batch Master:</label>
-          <select 
+          <label className="text-erp-sm font-bold text-gray-600 uppercase flex items-center gap-1.5">
+            <BookOpen className="w-4 h-4 text-cw-blue" />
+            Select Batch:
+          </label>
+          <select
             value={selectedBatch}
             onChange={(e) => handleBatchChange(e.target.value)}
-            className="w-[260px] font-bold text-cw-blueDark border border-erp-border px-2 py-1.5 focus:border-cw-blue outline-none cursor-pointer bg-white shadow-sm"
+            className="w-[320px] font-bold text-cw-blueDark border border-erp-border px-2 py-1.5 focus:border-cw-blue outline-none cursor-pointer bg-white shadow-sm"
           >
-            {batches.map(b => (
-              <option key={b} value={b}>{b === "ALL" ? "== View All Active Students ==" : b}</option>
+            <option value="ALL">-- All Students (Sabhi Batches) --</option>
+            {batches.filter(b => b !== "ALL").map(b => (
+              <option key={b} value={b}>{b}</option>
             ))}
           </select>
         </div>
 
         {/* Strict Date Navigator */}
         <div className="flex items-center gap-2">
-          <label className="text-erp-sm font-bold text-gray-600 uppercase">Ledger Date:</label>
+          <label className="text-erp-sm font-bold text-gray-600 uppercase">Date:</label>
           <div className="flex items-center border border-erp-border bg-white shadow-sm h-[32px] rounded-sm overflow-hidden">
             <button onClick={() => handleDateChange(-1)} className="px-3 h-full hover:bg-gray-100 border-r border-erp-border transition-colors flex items-center justify-center">
               <ChevronLeft className="h-4 w-4 text-gray-600" />
             </button>
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={selectedDate}
               onChange={(e) => {
                 if (isDirty && !window.confirm("Discard unsaved marks?")) return;
@@ -259,33 +265,32 @@ export default function AttendancePage() {
         <div className="flex items-center gap-3 ml-auto">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
-            <input 
-              type="text" 
-              placeholder="Search roster..." 
+            <input
+              type="text"
+              placeholder="Search student..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-3 py-1.5 w-[240px] border border-erp-border focus:border-cw-blue outline-none text-erp-sm font-medium shadow-sm"
             />
           </div>
-          
-          <button 
+
+          <button
             onClick={handleSave}
-            disabled={isSaving || isLoading || !isDirty || isAllBatchesView}
-            className={`flex items-center gap-1.5 px-6 py-1.5 text-erp-md font-bold rounded-erp shadow-sm transition-colors ${
-              isAllBatchesView 
-                ? "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed" 
+            disabled={isSaving || isLoading || !isDirty}
+            className={`flex items-center gap-1.5 px-6 py-1.5 text-erp-md font-bold rounded-erp shadow-sm transition-colors ${!isDirty
+                ? "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed"
                 : "bg-cw-green border border-[#006600] text-white hover:bg-[#005000] shadow-erp-button disabled:opacity-50 disabled:cursor-not-allowed"
-            }`}
+              }`}
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {isSaving ? "Writing to DB..." : "Save Register"}
+            {isSaving ? "Saving..." : "Save Register"}
           </button>
         </div>
 
         {/* PROGRESS BAR OVERLAY */}
-        {!isAllBatchesView && students.length > 0 && (
+        {students.length > 0 && (
           <div className="absolute bottom-0 left-0 h-[3px] bg-gray-200 w-full">
-            <div 
+            <div
               className={`h-full transition-all duration-500 ${completionPercentage === 100 ? 'bg-cw-green' : 'bg-cw-blue'}`}
               style={{ width: `${completionPercentage}%` }}
             />
@@ -297,57 +302,48 @@ export default function AttendancePage() {
       <div className="px-6 py-2.5 bg-erp-header border-b border-erp-border flex justify-between items-center text-erp-base shrink-0">
         <div className="flex gap-6 font-bold tracking-wide items-center">
           <span className="text-gray-700 bg-white px-2 py-0.5 border border-erp-border shadow-sm rounded-sm">Roster: {students.length}</span>
-          <span className="text-cw-green">Present: {summary.present}</span>
-          <span className="text-cw-red">Absent: {summary.absent}</span>
-          <span className="text-[#f57f17]">Late: {summary.late}</span>
-          {summary.unmarked > 0 && !isAllBatchesView && (
+          <span className="text-cw-green">P: {summary.present}</span>
+          <span className="text-cw-red">A: {summary.absent}</span>
+          <span className="text-[#f57f17]">L: {summary.late}</span>
+          <span className="text-gray-500">Leave: {(summary as any).leave ?? 0}</span>
+          {summary.unmarked > 0 && (
             <span className="text-gray-500 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" /> Unmarked: {summary.unmarked}</span>
           )}
         </div>
-        
+
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-1.5 text-erp-sm font-bold text-gray-700 cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={sendSms} 
-              onChange={() => setSendSms(!sendSms)} 
-              disabled={isAllBatchesView}
-              className="w-3.5 h-3.5 mt-0.5 accent-cw-blue disabled:opacity-50 cursor-pointer" 
+            <input
+              type="checkbox"
+              checked={sendSms}
+              onChange={() => setSendSms(!sendSms)}
+              className="w-3.5 h-3.5 mt-0.5 accent-cw-blue cursor-pointer"
             />
-            <MessageSquare className={`w-3.5 h-3.5 ${isAllBatchesView ? 'text-gray-400' : 'text-cw-blue'}`} /> 
-            <span className={isAllBatchesView ? 'text-gray-400' : ''}>Auto-SMS Absentees</span>
+            <MessageSquare className="w-3.5 h-3.5 text-cw-blue" />
+            <span>Auto-SMS Absentees</span>
           </label>
           <span className="text-gray-300">|</span>
-          <button 
-            onClick={markAllPresent} 
-            disabled={isAllBatchesView || isLoading}
-            className={`font-bold text-erp-sm flex items-center gap-1 px-3 py-1 border rounded-sm shadow-sm transition-colors ${
-              isAllBatchesView 
-                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" 
+          <button
+            onClick={markAllPresent}
+            disabled={isLoading || students.length === 0}
+            className={`font-bold text-erp-sm flex items-center gap-1 px-3 py-1 border rounded-sm shadow-sm transition-colors ${students.length === 0
+                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                 : "bg-white text-cw-green border-erp-border hover:bg-pastel-greenBg hover:border-cw-green"
-            }`}
+              }`}
           >
             <CheckCircle2 className="w-4 h-4" /> Mark All Present
           </button>
         </div>
       </div>
 
-      {/* 4. ALL BATCHES WARNING BANNER */}
-      {isAllBatchesView && (
-        <div className="bg-pastel-yellowBg border-b border-pastel-yellowBorder px-6 py-2 flex items-center gap-2 text-erp-sm text-gray-800 shadow-sm shrink-0">
-          <Info className="w-4 h-4 text-[#f57f17]" />
-          <strong>Read-Only Mode:</strong> You are currently viewing the master list of all students. Please select a specific batch from the dropdown above to mark and save attendance.
-        </div>
-      )}
-
-      {/* 5. CLASSIC ERP TABLE DATA GRID */}
+      {/* 4. CLASSIC ERP TABLE DATA GRID */}
       <div className="flex-1 p-6 overflow-auto bg-erp-bg">
         <div className="border border-erp-border bg-white shadow-sm rounded-erp max-w-[1400px] mx-auto overflow-hidden flex flex-col h-full relative">
-          
+
           {isLoading && (
             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
               <RefreshCw className="w-8 h-8 animate-spin mb-4 text-cw-blue" />
-              <p className="font-bold text-gray-600">Fetching secure database roster...</p>
+              <p className="font-bold text-gray-600">Fetching roster...</p>
             </div>
           )}
 
@@ -357,6 +353,7 @@ export default function AttendancePage() {
                 <tr className="text-erp-sm text-gray-600 uppercase tracking-wide">
                   <th className="py-3 px-6 w-24 text-center font-bold border-r border-erp-borderLight">Roll No</th>
                   <th className="py-3 px-6 font-bold border-r border-erp-borderLight">Student Name</th>
+                  {/* Show Batch Column only when viewing ALL so they know who belongs where */}
                   {isAllBatchesView && <th className="py-3 px-6 font-bold border-r border-erp-borderLight">Batch</th>}
                   <th className="py-3 px-6 text-center font-bold w-[380px]">Attendance Matrix</th>
                 </tr>
@@ -366,17 +363,17 @@ export default function AttendancePage() {
                 {filteredStudents.length === 0 && !isLoading ? (
                   <tr>
                     <td colSpan={isAllBatchesView ? 4 : 3} className="py-12 text-center font-bold text-gray-500 italic bg-gray-50">
-                      No student records found matching your filter criteria.
+                      No student records found.
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((student, index) => (
-                    <tr 
-                      key={student.id} 
+                    <tr
+                      key={student.id}
                       className={`border-b border-erp-borderLight ${index % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-pastel-blueBg transition-colors group`}
                     >
                       <td className="py-3 px-6 text-center font-bold text-gray-800 border-r border-erp-borderLight">{student.roll}</td>
-                      
+
                       <td className="py-3 px-6 border-r border-erp-borderLight">
                         <div className="flex flex-col">
                           <span className="font-bold text-cw-blueDark text-erp-base">{student.name}</span>
@@ -391,45 +388,49 @@ export default function AttendancePage() {
                           </span>
                         </td>
                       )}
-                      
-                      {/* Segmented Control for Attendance Marking */}
+
+                      {/* Fully Unlocked Segmented Control for Attendance Marking */}
                       <td className="py-2.5 px-6 text-center bg-white group-hover:bg-transparent transition-colors">
-                        <div className={`inline-flex shadow-sm border rounded-[3px] overflow-hidden ${isAllBatchesView ? 'border-gray-200 opacity-60' : 'border-erp-border'}`}>
-                          
-                          <button 
+                        <div className={`inline-flex shadow-sm border rounded-[3px] overflow-hidden border-erp-border`}>
+
+                          <button
                             onClick={() => toggleStatus(student.id, "present")}
-                            disabled={isAllBatchesView}
-                            className={`px-7 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${
-                              attendanceData[student.id] === "present" 
-                                ? "bg-cw-green text-white shadow-inner" 
-                                : "bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:hover:bg-gray-50"
-                            }`}
+                            className={`px-7 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${attendanceData[student.id] === "present"
+                                ? "bg-cw-green text-white shadow-inner"
+                                : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                              }`}
                           >
                             Present
                           </button>
-                          
-                          <button 
+
+                          <button
                             onClick={() => toggleStatus(student.id, "absent")}
-                            disabled={isAllBatchesView}
-                            className={`px-7 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${
-                              attendanceData[student.id] === "absent" 
-                                ? "bg-cw-red text-white shadow-inner" 
-                                : "bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:hover:bg-gray-50"
-                            }`}
+                            className={`px-7 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${attendanceData[student.id] === "absent"
+                                ? "bg-cw-red text-white shadow-inner"
+                                : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                              }`}
                           >
                             Absent
                           </button>
-                          
-                          <button 
+
+                          <button
                             onClick={() => toggleStatus(student.id, "late")}
-                            disabled={isAllBatchesView}
-                            className={`px-7 py-1.5 text-erp-sm font-bold uppercase transition-all ${
-                              attendanceData[student.id] === "late" 
-                                ? "bg-[#f57f17] text-white shadow-inner" 
-                                : "bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:hover:bg-gray-50"
-                            }`}
+                            className={`px-5 py-1.5 border-r border-erp-border text-erp-sm font-bold uppercase transition-all ${attendanceData[student.id] === "late"
+                                ? "bg-[#f57f17] text-white shadow-inner"
+                                : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                              }`}
                           >
                             Late
+                          </button>
+
+                          <button
+                            onClick={() => toggleStatus(student.id, "leave")}
+                            className={`px-5 py-1.5 text-erp-sm font-bold uppercase transition-all ${attendanceData[student.id] === "leave"
+                                ? "bg-gray-500 text-white shadow-inner"
+                                : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                              }`}
+                          >
+                            Leave
                           </button>
 
                         </div>
@@ -442,6 +443,46 @@ export default function AttendancePage() {
           </div>
         </div>
       </div>
+
+      {/* ================================================================= */}
+      {/* STICKY BOTTOM: SUBMIT REGISTER BAR */}
+      {/* ================================================================= */}
+      {students.length > 0 && (
+        <div className="shrink-0 sticky bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-cw-blue shadow-[0_-4px_20px_rgba(0,85,165,0.12)] px-6 py-3 flex items-center justify-between animate-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-cw-green" />
+              <span className="text-erp-sm font-bold text-gray-700">P: <span className="text-cw-green">{summary.present}</span></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-cw-red" />
+              <span className="text-erp-sm font-bold text-gray-700">A: <span className="text-cw-red">{summary.absent}</span></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-[#f57f17]" />
+              <span className="text-erp-sm font-bold text-gray-700">Late: <span className="text-[#f57f17]">{summary.late}</span></span>
+            </div>
+            {summary.unmarked > 0 && (
+              <span className="text-erp-sm font-bold text-cw-red flex items-center gap-1.5 bg-pastel-redBg border border-pastel-redBorder px-2.5 py-1 rounded-sm animate-pulse">
+                ⚠ {summary.unmarked} unmarked
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-erp-sm text-gray-500 font-medium hidden sm:block">
+              Batch: <strong className="text-gray-800">{selectedBatch === "ALL" ? "Sabhi Batches" : selectedBatch}</strong> &nbsp;·&nbsp; Date: <strong className="text-gray-800">{selectedDate}</strong>
+            </span>
+            <button
+              onClick={handleSave}
+              disabled={isSaving || isLoading || !isDirty}
+              className="flex items-center gap-2 bg-cw-blue text-white px-8 py-2.5 font-black text-erp-md rounded-erp shadow-erp-button hover:bg-cw-blueDark transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {isSaving ? "Writing to DB..." : "Submit Attendance Register"}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
