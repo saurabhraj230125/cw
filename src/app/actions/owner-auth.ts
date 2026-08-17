@@ -7,9 +7,10 @@ import { createClient } from "../../lib/supabase/server";
 // ==========================================
 export async function loginOwnerAction(email: string, pass: string) {
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password: pass });
   
   if (error) throw new Error(error.message);
+  
   return { success: true };
 }
 
