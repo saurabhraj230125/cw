@@ -121,7 +121,8 @@ export default function SettingsShell(props: SettingsShellProps) {
               onUpgradeSuccess={handleUpgradeSuccess} 
             />
           )}
-          {activeTab === "security" && <SecurityTab />}
+          {/* 🚨 DEEP FIX: Spread props down to the Security Tab so it satisfies the TypeScript requirements! */}
+          {activeTab === "security" && <SecurityTab {...props} />}
         </div>
       </div>
     </div>
