@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Building2, CreditCard, Shield, Star, Crown } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import GeneralTab from "./GeneralTab";
 import BillingTab from "./BillingTab";
 import SecurityTab from "./SecurityTab";
+
+// 🚨 DEEP FIX: Perfected the relative path (4 folders back!)
+import WaveLoader from "../../../../components/WaveLoader";
 
 export type SettingsShellProps = {
   membershipId: string;
@@ -29,10 +33,14 @@ export type SettingsShellProps = {
 
 type Tab = "general" | "billing" | "security";
 
-export default function SettingsShell(props: SettingsShellProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("general");
+function SettingsShellContent(props: SettingsShellProps) {
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get("tab") as Tab | null;
+  
+  const [activeTab, setActiveTab] = useState<Tab>(
+    (urlTab === "billing" || urlTab === "security") ? urlTab : "general"
+  );
 
-  // 🚨 DEEP FIX: Lifted State for Instant UI Updates after UTR Payment
   const [localIsPaid, setLocalIsPaid] = useState(props.isPaid);
   const [localPlan, setLocalPlan] = useState(props.currentPlan);
   const [localTransactions, setLocalTransactions] = useState(props.transactions || []);
@@ -121,10 +129,17 @@ export default function SettingsShell(props: SettingsShellProps) {
               onUpgradeSuccess={handleUpgradeSuccess} 
             />
           )}
-          {/* 🚨 DEEP FIX: Spread props down to the Security Tab so it satisfies the TypeScript requirements! */}
           {activeTab === "security" && <SecurityTab {...props} />}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsShell(props: SettingsShellProps) {
+  return (
+    <Suspense fallback={<WaveLoader />}>
+      <SettingsShellContent {...props} />
+    </Suspense>
   );
 }

@@ -12,7 +12,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (authError || !authData?.user) redirect("/login");
 
   // 2. Fetch Membership and Institute Data
-  // 🚨 DEEP FIX: Added `logo_url` to the query so the sidebar can actually see it!
   const { data: memberships, error: membershipError } = await supabase
     .from("core_memberships")
     .select(`
@@ -21,12 +20,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq("user_id", authData.user.id)
     .limit(1);
 
-  // 🚨 DEEP FIX: Smarter Error Handling
+  // 🚨 Smart Error Handling
   if (membershipError) {
     console.error("DashboardLayout membership error:", membershipError);
-    
-    // If it is a database crash (like your RLS recursion bug), DO NOT redirect to onboarding.
-    // Instead, trap the error here so the user doesn't get stuck in a fake loop.
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 p-6 font-sans">
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center border border-red-200">
@@ -45,16 +41,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   
   // 3. Verify Membership Exists
   const membership = memberships && memberships.length > 0 ? memberships[0] : null;
-  
-  // If the query succeeded, but returned NO rows, they actually need to onboard.
   if (!membership) {
     redirect("/onboarding");
   }
 
   // 4. Extract Institute Data safely
   const instituteData = Array.isArray(membership.institutes) ? membership.institutes[0] : membership.institutes;
-  
-  // Edge Case: If they have a membership but the institute was deleted
   if (!instituteData) {
     redirect("/onboarding");
   }
@@ -62,7 +54,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const instituteName = instituteData.name || "CoachingWala";
   
   // 5. Subscription & Trial Logic
-  // 🚨 INSTANT UNLOCK: If status is active, they are paid. No expiration check.
   const isPaid = instituteData.subscription_status === 'active';
   const currentPlan = instituteData.subscription_plan || 'Free Trial';
 
@@ -72,13 +63,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   
   const isTrialExpired = !isPaid && (now > trialExpiresAt);
   
-  // Calculate days left securely without negative numbers
+  // Calculate days left securely
   const daysLeft = (isPaid || isTrialExpired) 
     ? 0 
     : Math.max(0, Math.ceil((trialExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
   return (
-    // 🚨 DEEP FIX: Pass `logoUrl` directly down to the shell!
     <DashboardShell 
       instituteName={instituteName} 
       logoUrl={instituteData.logo_url || null}

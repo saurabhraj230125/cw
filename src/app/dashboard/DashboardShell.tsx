@@ -6,9 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, CalendarCheck, Wallet,
   BookOpen, CheckSquare, BellRing, BarChart3,
-  Plus, User, Zap, Menu, X,
+  Plus, User, Zap, Menu, X, ArrowRight,
   Layers, BookMarked, Lock, Loader2, ChevronRight, AlertOctagon,
-  Settings, CreditCard, LogOut, RefreshCw, HardDrive
+  Settings, CreditCard, LogOut, RefreshCw
 } from "lucide-react";
 import { logoutAction } from "../actions/owner-auth";
 import DashboardTour, { resetTour } from "../../components/DashboardTour";
@@ -21,7 +21,6 @@ export type DashboardShellProps = {
   isPaid: boolean;
   currentPlan: string;
   logoUrl?: string | null; 
-  storageUsed?: number; // Added to accept real storage usage from DB
 };
 
 export default function DashboardShell({
@@ -31,8 +30,7 @@ export default function DashboardShell({
   daysLeft, 
   isPaid, 
   currentPlan,
-  logoUrl,
-  storageUsed = 0.01 // Defaulting to 0.01 GB if not provided
+  logoUrl
 }: DashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -41,14 +39,9 @@ export default function DashboardShell({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Auto-redirect if base trial is expired and they haven't paid
-  useEffect(() => {
-    if (isTrialExpired && !isPaid && !pathname.includes("/dashboard/settings")) {
-      router.push("/dashboard/settings");
-    }
-  }, [isTrialExpired, isPaid, pathname, router]);
+  // 🚨 DEEP FIX: Removed the automatic URL redirect! 
+  // We want them to stay on the dashboard so they can physically see the giant lock screen instead of a forced URL change.
 
-  // Close profile dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
@@ -71,37 +64,23 @@ export default function DashboardShell({
     router.push("/login");
   };
 
-  // 🚨 DEEP LOCKING LOGIC: Strictly enforcing tier features
   const isBaseLocked = !isPaid && isTrialExpired;
-  
-  // Premium is locked if base is locked, OR if they are strictly on the Starter Plan
-  const isPremiumLocked = isBaseLocked || (currentPlan || "").includes("Starter");
-
-  // 🚨 DYNAMIC STORAGE LIMIT CALCULATION (IN GB)
-  const getStorageLimit = () => {
-    const plan = (currentPlan || "").toLowerCase();
-    if (plan.includes("enterprise")) return 100;
-    if (plan.includes("growth")) return 10;
-    return 1; // Default for Starter and Free Trial
-  };
-
-  const maxStorageGB = getStorageLimit();
-  const storagePercentage = Math.min((storageUsed / maxStorageGB) * 100, 100);
+  const isPremiumLocked = !isPaid || isBaseLocked || (currentPlan || "").includes("Starter");
 
   const navigation = [
-    // 🟢 BASE FEATURES (Available on Trial, Starter, Growth, and Enterprise)
-    { name: "Dashboard", href: isBaseLocked ? "/dashboard/settings" : "/dashboard", icon: LayoutDashboard, locked: isBaseLocked, tourClass: "tour-dashboard" },
-    { name: "Student Records", href: isBaseLocked ? "/dashboard/settings" : "/dashboard/students", icon: Users, locked: isBaseLocked, tourClass: "tour-students" },
-    { name: "Global Attendance", href: isBaseLocked ? "/dashboard/settings" : "/dashboard/attendance", icon: CalendarCheck, locked: isBaseLocked },
-    { name: "Fee Management", href: isBaseLocked ? "/dashboard/settings" : "/dashboard/fees", icon: Wallet, locked: isBaseLocked, tourClass: "tour-fee-table" },
-    { name: "Courses Master", href: isBaseLocked ? "/dashboard/settings" : "/dashboard/courses", icon: BookMarked, locked: isBaseLocked, tourClass: "tour-add-course" },
-    { name: "Batches Master", href: isBaseLocked ? "/dashboard/settings" : "/dashboard/batches", icon: Layers, locked: isBaseLocked, tourClass: "tour-add-batch" },
+    // 🟢 BASE FEATURES 
+    { name: "Dashboard", href: isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard", icon: LayoutDashboard, locked: isBaseLocked, tourClass: "tour-dashboard" },
+    { name: "Student Records", href: isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard/students", icon: Users, locked: isBaseLocked, tourClass: "tour-students" },
+    { name: "Global Attendance", href: isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard/attendance", icon: CalendarCheck, locked: isBaseLocked },
+    { name: "Fee Management", href: isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard/fees", icon: Wallet, locked: isBaseLocked, tourClass: "tour-fee-table" },
+    { name: "Courses Master", href: isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard/courses", icon: BookMarked, locked: isBaseLocked, tourClass: "tour-add-course" },
+    { name: "Batches Master", href: isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard/batches", icon: Layers, locked: isBaseLocked, tourClass: "tour-add-batch" },
 
-    // 🔴 PREMIUM FEATURES (Available ONLY on Free Trial, Growth Plan, and Enterprise)
-    { name: "DPP & Study Material", href: isPremiumLocked ? "/dashboard/settings" : "/dashboard/materials", icon: BookOpen, locked: isPremiumLocked },
-    { name: "Online Tests", href: isPremiumLocked ? "/dashboard/settings" : "/dashboard/tests", icon: CheckSquare, locked: isPremiumLocked },
-    { name: "Analytics & Reports", href: isPremiumLocked ? "/dashboard/settings" : "/dashboard/analytics", icon: BarChart3, locked: isPremiumLocked },
-    { name: "System Alerts", href: isPremiumLocked ? "/dashboard/settings" : "/dashboard/alerts", icon: BellRing, locked: isPremiumLocked },
+    // 🔴 PREMIUM FEATURES
+    { name: "DPP & Study Material", href: isPremiumLocked ? "/dashboard/settings?tab=billing" : "/dashboard/materials", icon: BookOpen, locked: isPremiumLocked },
+    { name: "Online Tests", href: isPremiumLocked ? "/dashboard/settings?tab=billing" : "/dashboard/tests", icon: CheckSquare, locked: isPremiumLocked },
+    { name: "Analytics & Reports", href: isPremiumLocked ? "/dashboard/settings?tab=billing" : "/dashboard/analytics", icon: BarChart3, locked: isPremiumLocked },
+    { name: "System Alerts", href: isPremiumLocked ? "/dashboard/settings?tab=billing" : "/dashboard/alerts", icon: BellRing, locked: isPremiumLocked },
   ];
 
   return (
@@ -110,8 +89,6 @@ export default function DashboardShell({
       
       {/* ── HEADER ── */}
       <header className="h-[70px] bg-gradient-to-r from-[#003366] via-[#004b87] to-[#0066cc] flex items-center justify-between px-4 sm:px-6 shrink-0 z-30 shadow-md">
-        
-        {/* Left Side: Mobile Menu & Logo */}
         <div className="flex items-center gap-3">
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-1 text-white hover:bg-white/10 rounded-[2px] transition-colors">
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -137,13 +114,11 @@ export default function DashboardShell({
           </div>
         </div>
         
-        {/* Right Side: Deeply Cleaned */}
         <div className="flex items-center gap-4 sm:gap-6">
-          <Link prefetch={false} href={isBaseLocked ? "/dashboard/settings" : "/dashboard/enquiries/new"} className="tour-enquiry hidden lg:flex items-center gap-1.5 bg-[#4CAF50] hover:bg-[#45a049] text-white px-5 py-2 rounded-[4px] text-[13px] font-bold shadow-sm transition-all active:scale-95">
+          <Link prefetch={false} href={isBaseLocked ? "/dashboard/settings?tab=billing" : "/dashboard/enquiries/new"} className="tour-enquiry hidden lg:flex items-center gap-1.5 bg-[#4CAF50] hover:bg-[#45a049] text-white px-5 py-2 rounded-[4px] text-[13px] font-bold shadow-sm transition-all active:scale-95">
             <Plus className="w-4 h-4" strokeWidth={3} /> New Enquiry
           </Link>
 
-          {/* Profile Dropdown */}
           <div ref={profileRef} className="relative">
             <button
               onClick={() => setIsProfileOpen(p => !p)}
@@ -162,7 +137,7 @@ export default function DashboardShell({
                   <Link prefetch={false} href="/dashboard/settings" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                     <Settings className="w-4 h-4 text-slate-400" /> View Profile &amp; Settings
                   </Link>
-                  <Link prefetch={false} href="/dashboard/settings" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                  <Link prefetch={false} href="/dashboard/settings?tab=billing" onClick={() => setIsProfileOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                     <CreditCard className="w-4 h-4 text-slate-400" /> Billing &amp; Plan
                   </Link>
                   <button onClick={() => { setIsProfileOpen(false); resetTour(); }} className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">
@@ -186,7 +161,8 @@ export default function DashboardShell({
         
         <aside className={`absolute md:static inset-y-0 left-0 z-20 w-[250px] bg-white border-r border-[#cccccc] flex flex-col shrink-0 transform transition-transform duration-200 ease-in-out ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
           <nav className="flex-1 overflow-y-auto pb-6 pt-2 hide-scrollbar flex flex-col">
-            <div className="flex-1">
+            
+            <div className="flex flex-col w-full">
               {navigation.map((item) => {
                 const isActive = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href) && !item.locked;
                 return (
@@ -208,29 +184,10 @@ export default function DashboardShell({
               })}
             </div>
 
-            {/* 🚨 DYNAMIC STORAGE TRACKER UI */}
-            <div className="px-4 py-5 mt-auto border-t border-[#e0e0e0] bg-slate-50 shrink-0">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                  <HardDrive className="w-3 h-3" /> Storage
-                </span>
-                <span className="text-[11px] font-black text-slate-700">
-                  {storageUsed.toFixed(2)} / {maxStorageGB} GB
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${storagePercentage > 90 ? 'bg-red-500' : storagePercentage > 75 ? 'bg-amber-500' : 'bg-[#0055a5]'}`} 
-                  style={{ width: `${storagePercentage}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* UPGRADE / RENEWAL BANNER */}
             {!isPaid && (
               <Link
                 prefetch={false}
-                href="/dashboard/settings"
+                href="/dashboard/settings?tab=billing"
                 onClick={handleNavClick}
                 className={`block mx-4 mt-2 mb-4 border shadow-sm transition-all rounded-[6px] overflow-hidden group cursor-pointer shrink-0 ${isTrialExpired ? 'border-red-300 bg-red-50' : 'border-[#0055a5]/20 bg-gradient-to-b from-[#ffffff] to-[#f8fafc]'}`}
               >
@@ -254,7 +211,46 @@ export default function DashboardShell({
           </nav>
         </aside>
 
-        <main className="flex-1 overflow-y-auto bg-[#f3f4f6]">{children}</main>
+        {/* 🚨 THE MASTER LOCK INTERCEPTOR */}
+        {/* If the trial is expired, AND they haven't paid, AND they are not on the settings page, completely block the app and show this wall! */}
+        <main className="flex-1 overflow-y-auto bg-[#f3f4f6]">
+          {!isPaid && isTrialExpired && !pathname.includes("/dashboard/settings") ? (
+            <div className="min-h-full flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+              <div className="bg-white border border-red-200 rounded-3xl p-8 md:p-12 max-w-xl w-full text-center shadow-2xl shadow-red-900/5 relative overflow-hidden">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-gradient-to-b from-red-50 to-transparent -z-10" />
+                
+                <div className="w-20 h-20 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 relative shadow-inner">
+                  <AlertOctagon className="w-10 h-10 text-red-600" />
+                  <div className="absolute -bottom-2 -right-2 bg-slate-800 p-1.5 rounded-lg border-2 border-white shadow-sm">
+                    <Lock className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+
+                <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-3">
+                  Free Trial Expired
+                </h2>
+                <p className="text-slate-500 text-sm md:text-base font-medium mb-8 leading-relaxed">
+                  Your 7-Day Free Trial has concluded. To regain access to your student directory, fee ledgers, and all institute operations, please activate your subscription.
+                </p>
+
+                <Link 
+                  href="/dashboard/settings?tab=billing"
+                  className="group relative inline-flex items-center justify-center gap-2 bg-[#0055a5] text-white px-8 py-4 rounded-xl font-bold text-sm hover:bg-[#004080] transition-all shadow-lg shadow-[#0055a5]/30 active:scale-95 w-full sm:w-auto"
+                >
+                  Activate Subscription Now
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-6">
+                  Your data is safely backed up
+                </p>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
+        </main>
+
       </div>
     </div>
   );

@@ -249,7 +249,7 @@ Here are your official login credentials:
 👤 *Username:* ${student.portalUsername}
 🔑 *Password:* ${student.portalPassword}
 
-🌐 *Login Link:* https://yourwebsite.com/student/login
+🌐 *Login Link:* https://cwwala.vercel.app/student/login
 
 Please keep these details secure. Let us know if you have any questions!`;
 
