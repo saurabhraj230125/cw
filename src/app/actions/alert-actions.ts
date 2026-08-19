@@ -1,58 +1,39 @@
 "use server";
 
-import { createClient } from "../../lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 
-// ==========================================
-// 1. GET ALL UNRESOLVED ALERTS
-// ==========================================
-export async function getActiveAlerts() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+export async function fetchLiveAlertsData(instituteId: string) {
+  if (!instituteId) return { students: [], batches: [], todayAttendance: [] };
 
-  if (!user) throw new Error("Authentication required.");
+  // 🚨 CRITICAL: Use the Service Role Key to act as an Admin and bypass browser RLS blocks
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-  // Note: We are fetching globally or by branch based on your setup. 
-  // If you want to lock it to branch, we would fetch the branch_id first.
-  // For now, we pull all unresolved alerts.
-  const { data, error } = await supabase
-    .from("system_alerts")
-    .select("*")
-    .eq("is_resolved", false)
-    .order("created_at", { ascending: false });
+  // 1. Fetch all active students
+  const { data: students } = await supabaseAdmin
+    .from('students')
+    .select('*')
+    .eq('institute_id', instituteId)
+    .eq('status', 'active');
 
-  if (error) throw new Error(error.message);
-  return data || [];
-}
+  // 2. Fetch all active batches
+  const { data: batches } = await supabaseAdmin
+    .from('batches')
+    .select('*')
+    .eq('status', 'active');
 
-// ==========================================
-// 2. RESOLVE A SINGLE ALERT
-// ==========================================
-export async function resolveAlertAction(alertId: string) {
-  const supabase = await createClient();
-  
-  const { error } = await supabase
-    .from("system_alerts")
-    .update({ is_resolved: true })
-    .eq("id", alertId);
+  // 3. Fetch today's exact attendance logs
+  const today = new Date().toISOString().split('T')[0];
+  const { data: attendance } = await supabaseAdmin
+    .from('attendance')
+    .select('student_id, date')
+    .eq('date', today);
 
-  if (error) throw new Error(error.message);
-  revalidatePath("/dashboard/alerts");
-  return { success: true };
-}
-
-// ==========================================
-// 3. MARK ALL AS READ (RESOLVE ALL)
-// ==========================================
-export async function resolveAllAlertsAction() {
-  const supabase = await createClient();
-  
-  const { error } = await supabase
-    .from("system_alerts")
-    .update({ is_resolved: true })
-    .eq("is_resolved", false);
-
-  if (error) throw new Error(error.message);
-  revalidatePath("/dashboard/alerts");
-  return { success: true };
+  return { 
+    students: students || [], 
+    batches: batches || [], 
+    todayAttendance: attendance || [] 
+  };
 }

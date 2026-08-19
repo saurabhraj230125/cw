@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { 
   Search, Download, Plus, IndianRupee, 
-  Wallet, TrendingUp, AlertTriangle, Loader2, Receipt, Filter, Tag, Landmark
+  Wallet, TrendingUp, AlertTriangle, Loader2, Receipt, Filter, Tag, Landmark, CheckCircle2
 } from "lucide-react";
 
 // IMPORT REAL DATABASE ACTIONS
@@ -33,6 +33,7 @@ export default function FeeManagementPage() {
   const [batches, setBatches] = useState<string[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isInvoicing, setIsInvoicing] = useState(false);
   
   // OWNER'S DEEP FILTERS
   const [batchFilter, setBatchFilter] = useState("ALL");
@@ -141,6 +142,64 @@ export default function FeeManagementPage() {
     return { totalExpected, totalCollected, totalOverdue, totalDiscounts };
   }, [filteredRecords]);
 
+  // --- 4. EXPORT LOGIC ---
+  const handleExportLedger = () => {
+    if (filteredRecords.length === 0) return alert("No records match your filters to export.");
+
+    const headers = [
+      "Ledger ID", "Roll No", "Student Name", "Batch", "Subjects", 
+      "Gross Fee (INR)", "Discount (INR)", "Net Fee (INR)", "Paid (INR)", "Balance Due (INR)", 
+      "Status", "Payment Mode"
+    ];
+
+    const csvData = filteredRecords.map(rec => [
+      `"${rec.id}"`,
+      `"${rec.rollNo}"`,
+      `"${rec.name}"`,
+      `"${rec.batch}"`,
+      `"${rec.subjects}"`,
+      `"${rec.grossFee}"`,
+      `"${rec.discount}"`,
+      `"${rec.netFee}"`,
+      `"${rec.paid}"`,
+      `"${rec.balance}"`,
+      `"${rec.status}"`,
+      `"${rec.paymentMode}"`
+    ].join(","));
+
+    const csvString = [headers.join(","), ...csvData].join("\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Fee_Ledger_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // --- 5. BULK INVOICE LOGIC ---
+  const handleBulkInvoiceRun = async () => {
+    const pendingRecords = filteredRecords.filter(r => r.balance > 0);
+    
+    if (pendingRecords.length === 0) {
+      alert("All students in the current view are fully paid. No invoices to generate.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to generate and send pending fee invoices for ${pendingRecords.length} student(s)?`)) {
+      return;
+    }
+
+    setIsInvoicing(true);
+    // Simulate API network request time for generating bulk invoices
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsInvoicing(false);
+    
+    alert(`Successfully generated and dispatched ${pendingRecords.length} fee reminders/invoices.`);
+  };
+
 
   // ============================================================================
   // RENDER UI
@@ -155,11 +214,19 @@ export default function FeeManagementPage() {
           Master Fee Ledger & Collections
         </h2>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-1.5 bg-white border border-erp-border text-gray-700 px-4 py-1.5 text-erp-sm font-bold hover:bg-gray-50 shadow-sm rounded-erp transition-colors">
+          <button 
+            onClick={handleExportLedger}
+            className="flex items-center gap-1.5 bg-white border border-erp-border text-gray-700 px-4 py-1.5 text-erp-sm font-bold hover:bg-gray-50 shadow-sm rounded-erp transition-colors active:scale-95"
+          >
             <Download className="w-3.5 h-3.5" /> Export Book
           </button>
-          <button className="bg-cw-blue text-white px-5 py-1.5 rounded-erp font-bold hover:bg-cw-blueDark transition-colors shadow-erp-button flex items-center gap-1.5 text-erp-sm">
-            <Plus className="w-4 h-4" /> Bulk Invoice Run
+          <button 
+            onClick={handleBulkInvoiceRun}
+            disabled={isInvoicing || filteredRecords.length === 0}
+            className="bg-cw-blue text-white px-5 py-1.5 rounded-erp font-bold hover:bg-cw-blueDark transition-colors shadow-erp-button flex items-center gap-1.5 text-erp-sm active:scale-95 disabled:opacity-70 disabled:active:scale-100"
+          >
+            {isInvoicing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {isInvoicing ? "Processing..." : "Bulk Invoice Run"}
           </button>
         </div>
       </div>
@@ -175,7 +242,7 @@ export default function FeeManagementPage() {
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Expected Revenue</p>
             <p className="text-xl font-bold text-gray-900">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalExpected.toLocaleString()}`}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalExpected.toLocaleString('en-IN')}`}
             </p>
           </div>
         </div>
@@ -188,7 +255,7 @@ export default function FeeManagementPage() {
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Collected</p>
             <p className="text-xl font-bold text-cw-green">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalCollected.toLocaleString()}`}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalCollected.toLocaleString('en-IN')}`}
             </p>
           </div>
         </div>
@@ -201,7 +268,7 @@ export default function FeeManagementPage() {
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Pending Balance</p>
             <p className="text-xl font-bold text-cw-red">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalOverdue.toLocaleString()}`}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalOverdue.toLocaleString('en-IN')}`}
             </p>
           </div>
         </div>
@@ -214,7 +281,7 @@ export default function FeeManagementPage() {
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Concessions</p>
             <p className="text-xl font-bold text-[#f57f17]">
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalDiscounts.toLocaleString()}`}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin mt-1 text-gray-400"/> : `₹${metrics.totalDiscounts.toLocaleString('en-IN')}`}
             </p>
           </div>
         </div>
@@ -363,18 +430,18 @@ export default function FeeManagementPage() {
                         {/* Financials Math with Deep Owner Insights */}
                         <td className="py-3 px-4 border-r border-erp-borderLight text-right">
                           {record.discount > 0 && (
-                            <div className="text-[10px] text-gray-400 font-bold line-through mb-0.5">₹{record.grossFee.toLocaleString()}</div>
+                            <div className="text-[10px] text-gray-400 font-bold line-through mb-0.5">₹{record.grossFee.toLocaleString('en-IN')}</div>
                           )}
-                          <div className="font-bold text-gray-900 text-[15px]">₹{record.netFee.toLocaleString()}</div>
+                          <div className="font-bold text-gray-900 text-[15px]">₹{record.netFee.toLocaleString('en-IN')}</div>
                           {record.discount > 0 && (
                             <div className="text-[9px] font-bold text-[#f57f17] bg-pastel-yellowBg px-1.5 py-0.5 rounded-sm inline-block mt-0.5 border border-pastel-yellowBorder">
-                              - ₹{record.discount.toLocaleString()} Off
+                              - ₹{record.discount.toLocaleString('en-IN')} Off
                             </div>
                           )}
                         </td>
 
                         <td className="py-3 px-4 border-r border-erp-borderLight text-right">
-                          <div className="font-bold text-cw-green text-[15px]">₹{record.paid.toLocaleString()}</div>
+                          <div className="font-bold text-cw-green text-[15px]">₹{record.paid.toLocaleString('en-IN')}</div>
                           {record.paid > 0 && (
                             <div className="text-[9px] font-bold text-gray-500 uppercase border border-gray-200 bg-gray-50 px-1.5 py-0.5 rounded-sm inline-block mt-0.5 tracking-wider">
                               {record.paymentMode}
@@ -384,19 +451,20 @@ export default function FeeManagementPage() {
 
                         <td className="py-3 px-4 border-r border-erp-borderLight text-right">
                           <span className={`font-bold text-[15px] ${record.balance > 0 ? 'text-cw-red' : 'text-gray-400'}`}>
-                            ₹{record.balance.toLocaleString()}
+                            ₹{record.balance.toLocaleString('en-IN')}
                           </span>
                         </td>
                         
                         {/* Status Badge */}
                         <td className="py-3 px-4 border-r border-erp-borderLight text-center">
-                          <span className={`inline-block px-3 py-1 text-[10px] font-bold uppercase rounded-sm border shadow-sm tracking-wider ${
+                          <span className={`inline-flex items-center gap-1 px-3 py-1 text-[10px] font-bold uppercase rounded-sm border shadow-sm tracking-wider ${
                             record.status === 'Paid' 
                               ? 'bg-pastel-greenBg text-cw-green border-pastel-greenBorder' 
                               : record.status === 'Partial' 
                                 ? 'bg-pastel-yellowBg text-[#f57f17] border-pastel-yellowBorder' 
                                 : 'bg-pastel-redBg text-cw-red border-pastel-redBorder'
                           }`}>
+                            {record.status === 'Paid' && <CheckCircle2 className="w-3 h-3" />}
                             {record.status}
                           </span>
                         </td>

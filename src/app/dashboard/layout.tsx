@@ -12,10 +12,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (authError || !authData?.user) redirect("/login");
 
   // 2. Fetch Membership and Institute Data
+  // 🚨 DEEP FIX: Added `logo_url` to the query so the sidebar can actually see it!
   const { data: memberships, error: membershipError } = await supabase
     .from("core_memberships")
     .select(`
-      institutes ( name, created_at, subscription_status, subscription_plan )
+      institutes ( name, logo_url, created_at, subscription_status, subscription_plan )
     `)
     .eq("user_id", authData.user.id)
     .limit(1);
@@ -77,8 +78,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : Math.max(0, Math.ceil((trialExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
   return (
+    // 🚨 DEEP FIX: Pass `logoUrl` directly down to the shell!
     <DashboardShell 
       instituteName={instituteName} 
+      logoUrl={instituteData.logo_url || null}
       isTrialExpired={isTrialExpired} 
       daysLeft={daysLeft}
       isPaid={isPaid}

@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { 
   ChevronRight, ChevronLeft, Save, Plus, 
   Upload, Trash2, CheckSquare, Edit3, AlertTriangle, Loader2, Calculator, CalendarClock,
-  Zap, Mail, BellRing, SplitSquareHorizontal, CheckCircle2, AlertCircle
+  Zap, Mail, BellRing, SplitSquareHorizontal, CheckCircle2, AlertCircle, RefreshCcw,
+  ArrowLeft, User, Users, Phone, GraduationCap, Layers 
 } from "lucide-react";
 import Link from "next/link";
+import { createBrowserClient } from "@supabase/ssr";
 
 // IMPORT REAL DATABASE ACTIONS
 import { getCourses } from "../../../actions/course-actions";
@@ -21,6 +23,8 @@ const steps = [
   { id: 4, name: "4. Payment Details" },
   { id: 5, name: "5. Batch & Automations" },
 ];
+
+const DRAFT_STORAGE_KEY = "cw_student_admission_draft";
 
 export default function NewStudentAdmissionPage() {
   return (
@@ -47,7 +51,9 @@ function AdmissionWizard() {
   const [isLoadingEditData, setIsLoadingEditData] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // DYNAMIC MASTER DATABASE STATE
+  const [isStateLoaded, setIsStateLoaded] = useState(false);
+  const [isDraftRecovered, setIsDraftRecovered] = useState(false);
+
   const [masterCourses, setMasterCourses] = useState<any[]>([]);
   const [masterBatches, setMasterBatches] = useState<any[]>([]);
   const [isFetchingMasterData, setIsFetchingMasterData] = useState(true);
@@ -55,7 +61,6 @@ function AdmissionWizard() {
   const [showSecondaryGuardian, setShowSecondaryGuardian] = useState(false);
   const [showInstallments, setShowInstallments] = useState(false);
 
-  // CENTRALIZED FORM STATE
   const [formData, setFormData] = useState({
     firstName: "", middleName: "", lastName: "",
     phone: "", email: "", gender: "Male", category: "Select",
@@ -72,6 +77,37 @@ function AdmissionWizard() {
 
   const [installments, setInstallments] = useState<any[]>([]);
   const [splitCount, setSplitCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      const savedDraft = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed.formData && (parsed.formData.firstName || parsed.formData.phone)) {
+            setFormData(parsed.formData);
+            if (parsed.installments) setInstallments(parsed.installments);
+            if (parsed.showInstallments !== undefined) setShowInstallments(parsed.showInstallments);
+            if (parsed.splitCount) setSplitCount(parsed.splitCount);
+            if (parsed.currentStep) setCurrentStep(parsed.currentStep);
+            
+            setIsDraftRecovered(true);
+            setTimeout(() => setIsDraftRecovered(false), 4000); 
+          }
+        } catch (e) {
+          console.error("Failed to parse draft", e);
+        }
+      }
+    }
+    setIsStateLoaded(true);
+  }, [isEditMode]);
+
+  useEffect(() => {
+    if (isStateLoaded && !isEditMode) {
+      const draftData = { formData, installments, showInstallments, splitCount, currentStep };
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftData));
+    }
+  }, [formData, installments, showInstallments, splitCount, currentStep, isStateLoaded, isEditMode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -112,9 +148,7 @@ function AdmissionWizard() {
           const linkedCourseId = s.student_subjects?.[0]?.subjects?.id || ""; 
           const linkedCourseName = s.course_id || "";
 
-          if (s.sec_guardian_name) {
-            setShowSecondaryGuardian(true);
-          }
+          if (s.sec_guardian_name) setShowSecondaryGuardian(true);
 
           setFormData({
             firstName, middleName, lastName,
@@ -146,7 +180,6 @@ function AdmissionWizard() {
           });
         }
       } catch (err) {
-        console.error("Error loading edit data:", err);
         setSaveError("Failed to fetch student record for editing.");
       } finally {
         if (isMounted) setIsLoadingEditData(false);
@@ -157,12 +190,16 @@ function AdmissionWizard() {
     return () => { isMounted = false; };
   }, [isEditMode, editId]);
 
-  // THE REAL-TIME FINANCIAL ENGINE
+  const clearDraft = () => {
+    if (!window.confirm("Are you sure you want to clear this draft and start over?")) return;
+    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+    window.location.reload(); 
+  };
+
   const netTotal = Math.max(0, formData.baseFee - formData.discount);
   const balanceDue = Math.max(0, netTotal - formData.amountPaid);
   const currentInstallmentSum = installments.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
 
-  // AUTO-SPLITTER MATH ENGINE
   useEffect(() => {
     if (splitCount > 0 && balanceDue > 0) {
       const baseAmount = Math.floor(balanceDue / splitCount);
@@ -174,7 +211,6 @@ function AdmissionWizard() {
       for (let i = 0; i < splitCount; i++) {
         const instDate = new Date(today);
         instDate.setDate(instDate.getDate() + (30 * (i + 1))); 
-        
         newInstalments.push({
           id: Date.now() + i, 
           date: instDate.toISOString().split('T')[0],
@@ -200,60 +236,39 @@ function AdmissionWizard() {
     }
     if (step === 4 && showInstallments && balanceDue > 0) {
       if (currentInstallmentSum !== balanceDue) {
-        setSaveError(`Installment Ledger mismatch! The sum of installments (₹${currentInstallmentSum}) must exactly equal the Balance Due (₹${balanceDue}).`);
+        setSaveError(`Installment Ledger mismatch! Sum must exactly equal Balance Due.`);
         return false;
       }
     }
     return true;
   };
 
-  const handleNext = () => {
-    if (validateStep(currentStep)) setCurrentStep((prev) => Math.min(prev + 1, 5));
-  };
-  const handlePrev = () => {
-    setSaveError(null);
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
-  };
+  const handleNext = () => { if (validateStep(currentStep)) setCurrentStep((prev) => Math.min(prev + 1, 5)); };
+  const handlePrev = () => { setSaveError(null); setCurrentStep((prev) => Math.max(prev - 1, 1)); };
 
   const handleCourseSelect = (selectedId: string) => {
     const selectedCourse = masterCourses.find((c: any) => c.id === selectedId);
     setFormData(prev => ({
-      ...prev,
-      courseId: selectedId,
-      courseName: selectedCourse ? selectedCourse.name : "",
-      baseFee: selectedCourse ? Number(selectedCourse.fee) : 0, 
-      discount: 0, amountPaid: 0
+      ...prev, courseId: selectedId, courseName: selectedCourse ? selectedCourse.name : "",
+      baseFee: selectedCourse ? Number(selectedCourse.fee) : 0, discount: 0, amountPaid: 0
     }));
     setSplitCount(0); setInstallments([]); setShowInstallments(false);
   };
 
-  const generateInstallments = () => {
-    setShowInstallments(true);
-  };
+  const generateInstallments = () => setShowInstallments(true);
 
-  // =======================================================
-  // DEEP FINTECH FIX: AUTO-BALANCING SMART LEDGER
-  // =======================================================
   const updateInstallment = (id: number, field: string, value: string | number) => {
-    let updated = installments.map((inst: any) => 
-      inst.id === id ? { ...inst, [field]: value } : inst
-    );
-
-    // If they manually edit an AMOUNT, auto-adjust the LAST installment to keep math perfect
+    let updated = installments.map((inst: any) => inst.id === id ? { ...inst, [field]: value } : inst);
     if (field === "amount" && updated.length > 1) {
       const editedIndex = updated.findIndex((inst: any) => inst.id === id);
       const lastIndex = updated.length - 1;
-
       if (editedIndex !== lastIndex) {
-        const sumWithoutLast = updated.reduce((acc: number, curr: any, idx: number) => 
-          acc + (idx !== lastIndex ? (Number(curr.amount) || 0) : 0), 0
-        );
+        const sumWithoutLast = updated.reduce((acc: number, curr: any, idx: number) => acc + (idx !== lastIndex ? (Number(curr.amount) || 0) : 0), 0);
         updated[lastIndex].amount = Math.max(0, balanceDue - sumWithoutLast);
       }
     }
-
     setInstallments(updated);
-    if (field === "amount") setSplitCount(0); // Break auto-split lock
+    if (field === "amount") setSplitCount(0); 
   };
 
   const addInstallment = () => {
@@ -276,7 +291,29 @@ function AdmissionWizard() {
     setSaveError(null);
 
     try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) throw new Error("Not authenticated");
+
+      const { data: member } = await supabase.from('core_memberships').select('institute_id').eq('user_id', authData.user.id).single();
+      if (!member?.institute_id) throw new Error("Institute not found");
+
+      // Auto-generate credentials
+      const baseName = formData.firstName.replace(/\s+/g, '').toLowerCase().substring(0, 4);
+      const generatedUsername = `${baseName}${Math.floor(1000 + Math.random() * 9000)}`; 
+      const generatedPassword = Math.random().toString(36).slice(-6).toUpperCase(); 
+
       const submitData = new FormData();
+
+      // 🚨 DEEP FIX: Explicitly appending the institute_id and portal credentials!
+      submitData.append("institute_id", member.institute_id);
+      submitData.append("portal_username", generatedUsername);
+      submitData.append("portal_password", generatedPassword);
+
       submitData.append("roll_number", formData.rollNo);
       submitData.append("full_name", `${formData.firstName} ${formData.middleName} ${formData.lastName}`.trim());
       submitData.append("parent_phone", formData.guardianPhone || formData.phone);
@@ -309,8 +346,6 @@ function AdmissionWizard() {
       let response = isEditMode && editId ? await updateStudentAction(editId, submitData) : await addStudentAction(submitData);
 
       if (response.success) {
-        
-        // 🚀 LIVE MAKE.COM AUTOMATION TRIGGER
         if (formData.sendWelcomeEmail || formData.setupInstallmentReminders) {
            const webhookPayload = {
              studentName: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -322,11 +357,14 @@ function AdmissionWizard() {
              await fetch("https://hook.eu1.make.com/kv91rgntri5l3zd9qcte3q4io1r4kdj3", {
                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(webhookPayload)
              });
-             console.log("Successfully fired to Make.com", webhookPayload);
            } catch (webhookError) { console.error("Webhook firing failed.", webhookError); }
         }
 
+        sessionStorage.removeItem(DRAFT_STORAGE_KEY);
         alert(isEditMode ? "Student record successfully updated." : "Admission securely written to database.");
+        
+        // 🚨 DEEP FIX: Force Next.js to flush its cache so the directory is fully up-to-date!
+        router.refresh();
         router.push(isEditMode ? `/dashboard/students/${editId}` : "/dashboard/students"); 
       }
     } catch (err: any) {
@@ -336,26 +374,48 @@ function AdmissionWizard() {
     }
   };
 
-  if (isLoadingEditData) {
+  if (isLoadingEditData || !isStateLoaded) {
     return (
       <main className="min-h-screen bg-erp-bg flex items-center justify-center">
         <p className="text-gray-500 font-bold flex items-center gap-2 text-erp-lg">
-          <Loader2 className="w-5 h-5 animate-spin text-cw-blue" /> Fetching student record...
+          <Loader2 className="w-5 h-5 animate-spin text-cw-blue" /> 
+          {isStateLoaded ? "Fetching student record..." : "Recovering workspace..."}
         </p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-erp-bg font-sans flex flex-col pb-10">
-      <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex justify-between items-center shadow-sm">
-        <h2 className="text-erp-lg text-gray-900 font-bold flex items-center gap-2 uppercase tracking-wide">
-          {isEditMode ? <Edit3 className="w-5 h-5 text-cw-blue" /> : <Plus className="w-5 h-5 text-cw-green" />}
-          {isEditMode ? `Edit Master Record : ${formData.rollNo}` : "New Master Admission"}
-        </h2>
-        <Link href={isEditMode ? `/dashboard/students/${editId}` : "/dashboard/students"} className="text-erp-md text-cw-blue hover:underline font-bold">
-          Cancel & Return
-        </Link>
+    <main className="min-h-screen bg-erp-bg font-sans flex flex-col pb-10 relative overflow-x-hidden">
+      
+      <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-in-out ${isDraftRecovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
+        <div className="bg-slate-900 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-slate-700">
+          <RefreshCcw className="w-4 h-4 text-green-400 animate-spin-slow" />
+          <span className="text-sm font-bold tracking-wide">Unsaved admission draft recovered.</span>
+        </div>
+      </div>
+
+      <div className="px-6 py-3 border-b border-erp-border bg-white shrink-0 flex justify-between items-center shadow-sm sticky top-0 z-40">
+        <div className="flex items-center gap-4">
+          <Link href={isEditMode ? `/dashboard/students/${editId}` : "/dashboard/students"} className="p-1.5 -ml-1.5 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h2 className="text-erp-lg text-gray-900 font-bold flex items-center gap-2 uppercase tracking-wide">
+            {isEditMode ? <Edit3 className="w-5 h-5 text-cw-blue" /> : <Plus className="w-5 h-5 text-cw-green" />}
+            {isEditMode ? `Edit Master Record : ${formData.rollNo}` : "New Master Admission"}
+          </h2>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          {!isEditMode && (
+            <button onClick={clearDraft} className="text-sm font-bold text-slate-400 hover:text-red-500 transition-colors hidden sm:block">
+              Discard Draft
+            </button>
+          )}
+          <Link href={isEditMode ? `/dashboard/students/${editId}` : "/dashboard/students"} className="text-erp-md text-cw-blue hover:underline font-bold">
+            Cancel & Return
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 p-6 overflow-auto">
@@ -705,8 +765,12 @@ function AdmissionWizard() {
                   </h3>
                   <div className="flex flex-col md:flex-row items-start gap-4">
                     <div className="w-full md:w-1/2">
-                      <label className="text-erp-base font-bold text-gray-700 block mb-2">
-                        Select Active Batch / Batch Assign Karein <span className="text-cw-red">*</span>
+                      <label className="text-erp-base font-bold text-gray-700 block mb-2 flex items-center justify-between">
+                        <span>Select Active Batch <span className="text-cw-red">*</span></span>
+                        
+                        <Link href="/dashboard/batches" className="text-cw-blue hover:underline font-medium text-sm flex items-center gap-1">
+                          <Plus className="w-3.5 h-3.5"/> Create New
+                        </Link>
                       </label>
                       <select 
                         value={formData.batch}
@@ -725,6 +789,10 @@ function AdmissionWizard() {
                           ))
                         )}
                       </select>
+                      <p className="text-[10px] text-slate-500 font-medium mt-2">
+                        If the batch you need isn't here, click "Create New". <br/>
+                        <span className="font-bold text-[#0055a5]">Don't worry, all your typed details above are automatically saved!</span>
+                      </p>
                     </div>
                     <div className={`w-full md:w-1/2 border p-5 flex flex-col items-center justify-center text-center rounded-erp shadow-inner transition-colors ${formData.batch ? 'bg-pastel-greenBg border-pastel-greenBorder text-cw-green' : 'bg-erp-header border-erp-border text-gray-500'}`}>
                       {formData.batch ? (
@@ -811,9 +879,6 @@ function AdmissionWizard() {
   );
 }
 
-// ----------------------------------------------------
-// STRICTLY TYPED REUSABLE FIELD COMPONENT
-// ----------------------------------------------------
 interface FieldProps {
   label: string;
   required?: boolean;

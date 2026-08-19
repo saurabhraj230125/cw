@@ -7,7 +7,6 @@ import GeneralTab from "./GeneralTab";
 import BillingTab from "./BillingTab";
 import SecurityTab from "./SecurityTab";
 
-// ─── UNIFIED PROP DEFINITION (Fixes all IntrinsicAttributes errors) ───
 export type SettingsShellProps = {
   membershipId: string;
   createdAt: string;
@@ -25,6 +24,7 @@ export type SettingsShellProps = {
   currentPlan: string;
   studentsCount: number;
   logoUrl: string | null;
+  transactions: any[];
 };
 
 type Tab = "general" | "billing" | "security";
@@ -32,9 +32,20 @@ type Tab = "general" | "billing" | "security";
 export default function SettingsShell(props: SettingsShellProps) {
   const [activeTab, setActiveTab] = useState<Tab>("general");
 
+  // 🚨 DEEP FIX: Lifted State for Instant UI Updates after UTR Payment
+  const [localIsPaid, setLocalIsPaid] = useState(props.isPaid);
+  const [localPlan, setLocalPlan] = useState(props.currentPlan);
+  const [localTransactions, setLocalTransactions] = useState(props.transactions || []);
+
+  const handleUpgradeSuccess = (newTransaction: any) => {
+    setLocalIsPaid(true);
+    setLocalPlan(newTransaction.plan_name);
+    setLocalTransactions([newTransaction, ...localTransactions]);
+  };
+
   const TABS: { id: Tab; label: string; icon: any; desc: string }[] = [
     { id: "general", label: "General Information", icon: Building2, desc: "Branding & details" },
-    { id: "billing", label: "Billing & Plans", icon: CreditCard, desc: "Subscription & upgrade" },
+    { id: "billing", label: "Billing & Plans", icon: CreditCard, desc: "Subscription & receipts" },
     { id: "security", label: "Security & Sessions", icon: Shield, desc: "Password & access" },
   ];
 
@@ -45,7 +56,7 @@ export default function SettingsShell(props: SettingsShellProps) {
           <div>
             <div className="flex items-center gap-2.5 mb-1.5">
               <span className="text-white/60 text-[11px] font-black uppercase tracking-widest leading-none">Settings</span>
-              {props.isPaid ? (
+              {localIsPaid ? (
                 <span className="flex items-center gap-1.5 bg-gradient-to-br from-[#0055a5] to-[#004080] text-white text-[11px] font-black px-3 py-1 rounded-full shadow-inner animate-pulse">
                   <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300"/> Pro Account
                 </span>
@@ -61,7 +72,7 @@ export default function SettingsShell(props: SettingsShellProps) {
             <p className="text-white/50 text-sm mt-0.5">Manage your institute profile, billing subscription, and account security.</p>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            {!props.isPaid && (
+            {!localIsPaid && (
               <button onClick={() => setActiveTab("billing")} className="flex items-center gap-1.5 bg-gradient-to-br from-white to-blue-50 text-[#0055a5] text-xs font-black px-5 py-2.5 rounded-xl hover:bg-blue-100 transition-colors shadow-sm scale-100 hover:scale-105 active:scale-100">
                 <Crown className="w-3.5 h-3.5 fill-[#0055a5]"/> Get Pro Access
               </button>
@@ -101,7 +112,15 @@ export default function SettingsShell(props: SettingsShellProps) {
 
         <div className="flex-1 min-w-0">
           {activeTab === "general" && <GeneralTab {...props} />}
-          {activeTab === "billing" && <BillingTab {...props} />}
+          {activeTab === "billing" && (
+            <BillingTab 
+              {...props} 
+              isPaid={localIsPaid} 
+              currentPlan={localPlan} 
+              transactions={localTransactions} 
+              onUpgradeSuccess={handleUpgradeSuccess} 
+            />
+          )}
           {activeTab === "security" && <SecurityTab />}
         </div>
       </div>
