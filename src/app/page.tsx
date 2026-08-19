@@ -35,7 +35,7 @@ const FAQS = [
   { q: "Can I upgrade my plan later?",                    a: "Yes. You can upgrade at any time. Your data, students, batches, and history carry forward completely. You never lose progress when you grow." },
   { q: "Does it support multiple batches?",               a: "Yes. All plans support multiple batches with independent schedules, teachers, student lists, attendance, study material, and fee structures — no data mixing." },
   { q: "Can students access the platform?",               a: "Every plan includes a student portal where students can view attendance, download study material, submit DPPs, take tests and check fee payment status without contacting the institute." },
-  { q: "Does CoachingWala build websites?",               a: "CoachingWala is a full institute management platform — not a website builder. The Professional plan supports a custom student portal domain so students access the portal from your own domain." },
+  { q: "Does CoachingWala build websites?",               a: "CoachingWala is a full institute management platform — not a website builder. The Enterprise plan supports a custom student portal domain so students access the portal from your own domain." },
 ];
 
 // ════════════════════════════════════════════════════════
@@ -174,7 +174,6 @@ function Hero({ onOpenDemo }: { onOpenDemo: () => void }) {
           </p>
         </div>
 
-        {/* The Glowing Video Player Widget */}
         <div className="relative max-w-5xl mx-auto group perspective-1000">
           <div className="relative rounded-2xl overflow-hidden border border-slate-200/60 bg-white shadow-[0_20px_60px_-15px_rgba(0,85,165,0.4)] transition-all duration-700 hover:shadow-[0_20px_60px_-15px_rgba(0,85,165,0.6)] hover:-translate-y-2">
             <div className="h-10 bg-slate-50/90 backdrop-blur-sm border-b border-slate-200 flex items-center px-4 gap-2 absolute top-0 w-full z-20">
@@ -203,10 +202,6 @@ function Hero({ onOpenDemo }: { onOpenDemo: () => void }) {
     </section>
   );
 }
-
-// ════════════════════════════════════════════════════════
-// PAGE SECTIONS
-// ════════════════════════════════════════════════════════
 
 function ProblemSolution() {
   const BEFORE = ["Paper attendance registers","Excel fee spreadsheets","WhatsApp study material groups","Manual fee tracking & receipts","Scattered student records"];
@@ -307,10 +302,8 @@ function Pricing() {
           <p className="mt-4 text-slate-500 text-lg max-w-xl mx-auto">No hidden fees. Every plan includes a full 7-day trial to experience the power of CoachingWala.</p>
         </div>
         
-        {/* ─── FLAWLESS MONTHLY / ANNUAL TOGGLE ─── */}
         <div className="flex justify-center mb-16 relative z-20">
           <div className="bg-white p-1.5 rounded-full border border-slate-200 flex items-center shadow-sm relative w-[290px] h-[52px]">
-            {/* The sliding pill background */}
             <div 
               className="absolute inset-y-1.5 bg-slate-100 border border-slate-200 rounded-full transition-transform duration-300 ease-out z-0"
               style={{
@@ -318,7 +311,6 @@ function Pricing() {
                 transform: isAnnual ? 'translateX(110px)' : 'translateX(0px)'
               }}
             />
-            {/* Buttons */}
             <button
               onClick={() => setIsAnnual(false)}
               className={`relative w-[110px] h-full rounded-full text-[14px] font-black transition-colors duration-300 z-10 ${!isAnnual ? "text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
@@ -334,10 +326,9 @@ function Pricing() {
           </div>
         </div>
 
-        {/* ─── DEDICATED PRICING CARDS ─── */}
         <div className="grid lg:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto mb-24">
           
-          {/* STARTER CARD */}
+          {/* STARTER CARD: ₹7,500/year */}
           <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col relative z-0">
             <h3 className="text-xl font-black text-slate-900 mb-2">Starter</h3>
             <p className="text-sm font-medium text-slate-500 mb-6 h-10">Perfect for independent tutors going digital.</p>
@@ -359,7 +350,7 @@ function Pricing() {
             </ul>
           </div>
 
-          {/* GROWTH CARD (HIGHLIGHTED) */}
+          {/* GROWTH CARD: ₹15,000/year */}
           <div className="bg-white rounded-3xl p-8 border-2 border-[#0055a5] shadow-2xl shadow-[#0055a5]/20 ring-4 ring-[#0055a5]/10 transform lg:scale-105 transition-all duration-300 flex flex-col relative z-10">
             <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-[#003366] to-[#0055a5] rounded-t-3xl"/>
             <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0055a5] text-white text-[11px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-md whitespace-nowrap">
@@ -386,16 +377,16 @@ function Pricing() {
             </ul>
           </div>
 
-          {/* PROFESSIONAL CARD (DARK THEME) */}
+          {/* ENTERPRISE CARD: ₹25,000/year */}
           <div className="bg-slate-900 rounded-3xl p-8 border border-slate-800 shadow-xl flex flex-col relative overflow-hidden z-0">
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none"/>
-            <h3 className="text-xl font-black text-white mb-2 relative z-10">Professional</h3>
+            <h3 className="text-xl font-black text-white mb-2 relative z-10">Enterprise</h3>
             <p className="text-sm font-medium text-slate-400 mb-6 h-10 relative z-10">Unlimited power for established institutes.</p>
             <div className="flex items-baseline gap-1 mb-2 relative z-10">
-              <span className="text-5xl font-black text-white">{"\u20b9"}{isAnnual ? "2,000" : "2,499"}</span>
+              <span className="text-5xl font-black text-white">{"\u20b9"}{isAnnual ? "2,083" : "2,999"}</span>
               <span className="text-base text-slate-500 font-bold">/month</span>
             </div>
-            <p className="text-sm font-bold text-emerald-400 mb-8 h-5 relative z-10">{isAnnual ? "Billed ₹24,000 annually" : "Billed monthly"}</p>
+            <p className="text-sm font-bold text-emerald-400 mb-8 h-5 relative z-10">{isAnnual ? "Billed ₹25,000 annually" : "Billed monthly"}</p>
             <Link href="/signup" className="w-full bg-white hover:bg-slate-200 text-slate-900 font-black py-4 rounded-xl text-center transition-colors mb-8 shadow-sm relative z-10">
               Start Free Trial
             </Link>
@@ -426,7 +417,7 @@ function Pricing() {
                     <th className="p-6 bg-slate-50 border-b border-slate-200 w-2/5 text-sm font-black text-slate-500 uppercase tracking-widest">Core Modules</th>
                     <th className="p-6 bg-white border-b border-slate-200 border-l w-1/5 text-center text-lg font-black text-slate-900">Starter</th>
                     <th className="p-6 bg-blue-50/40 border-b border-blue-100 border-l border-r border-[#0055a5]/20 w-1/5 text-center text-lg font-black text-[#0055a5]">Growth</th>
-                    <th className="p-6 bg-slate-900 border-b border-slate-800 border-l w-1/5 text-center text-lg font-black text-white">Professional</th>
+                    <th className="p-6 bg-slate-900 border-b border-slate-800 border-l w-1/5 text-center text-lg font-black text-white">Enterprise</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

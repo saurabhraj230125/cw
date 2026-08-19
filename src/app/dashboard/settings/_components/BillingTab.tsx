@@ -83,7 +83,7 @@ export default function BillingTab(props: BillingProps) {
     return () => { isMounted = false; };
   }, [supabase]);
 
-  // 🚨 DYNAMIC PLAN LIMITS IMPLEMENTED HERE
+  // 🚨 DYNAMIC PLAN LIMITS (Perfectly synced with Landing Page limits)
   let studentsMax = 100;
   let storageMax = 1; // 1 GB Default for Starter / Free Trial
   
@@ -93,7 +93,7 @@ export default function BillingTab(props: BillingProps) {
     studentsMax = 500;
     storageMax = 10; 
   } else if (planName.includes("Enterprise")) {
-    studentsMax = 5000; 
+    studentsMax = 2000; // Synced with the new Enterprise 2k limit
     storageMax = 100; 
   }
   
@@ -191,12 +191,15 @@ export default function BillingTab(props: BillingProps) {
           <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
               { label: "Active Students", used: liveStudentCount, max: studentsMax, unit: "students", color: "bg-[#0055a5]" },
-              { label: "Storage Used",    used: storageUsed,   max: storageMax,  unit: "GB",        color: "bg-amber-500" },
+              { label: "Storage Used",    used: storageUsed,  max: storageMax,  unit: "GB",        color: "bg-amber-500" },
             ].map(s => (
               <div key={s.label}>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-slate-600">{s.label}</span>
-                  <span className="text-xs font-black text-slate-900 tabular-nums">{s.used} / {s.max === 5000 ? "∞" : s.max}</span>
+                  {/* 🚨 Formatted perfectly for commas */}
+                  <span className="text-xs font-black text-slate-900 tabular-nums">
+                    {s.used.toLocaleString('en-IN')} / {s.max.toLocaleString('en-IN')}
+                  </span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden relative shadow-inner border border-slate-200">
                   <div
